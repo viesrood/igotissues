@@ -74,6 +74,8 @@ Every setting is in the control panel and can be overridden per environment in
 | `position` | `bottom-right` | Or `bottom-left`. |
 | `autoInject` | `false` | Add the button to front-end pages through `endBody()`. |
 | `includeReporter` | `true` | Put the reporter's name in the issue. |
+| `autoFields` | `[]` | Form fields the site fills in itself. See below. |
+| `skipFields` | `[]` | Form fields that are left out. See below. |
 | `captureErrors` | `true` | Record unexpected errors. |
 | `captureInDevMode` | `false` | Also while devMode is on. |
 | `captureConsole` | `false` | Also from console commands. |
@@ -103,6 +105,22 @@ A page can open the window itself with `window.IGotIssues.open()`.
 labels, so an issue made here reads like one filed through GitHub's own form. `textarea`,
 `input` and `dropdown` fields are used; `markdown` and `checkboxes` are skipped. A
 repository without forms gets a built-in bug form and feature form.
+
+**Fields the site can answer itself.** An issue form often asks for things the site
+already knows, or for a log the technical report already carries. In
+`config/igotissues.php`:
+
+```php
+// Field id => the label of a line in the technical report.
+'autoFields' => ['page-url' => 'URL', 'environment' => 'Environment'],
+
+// Field ids that are not shown and not put in the issue.
+'skipFields' => ['logs'],
+```
+
+The reporter does not see either kind. A dropdown that is filled in this way only takes a
+value that is one of its options; add a line with the right wording through
+`Reports::EVENT_DEFINE_CONTEXT` when the built-in one does not match.
 
 Labels are never created. A label that does not exist in the repository is left off.
 

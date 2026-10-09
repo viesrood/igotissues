@@ -197,6 +197,22 @@ final class HelpersTest extends TestCase
         self::assertSame(['Lokaal (DDEV)', 'Productie'], $form['fields'][1]['options']);
     }
 
+    public function testTheSiteCanAnswerAFieldItselfAndLeaveAnotherOut(): void
+    {
+        $form = IssueForms::parse('fout.yml', self::FORM);
+        self::assertNotNull($form);
+
+        self::assertSame(['gebeurde', 'omgeving'], array_column(IssueForms::without($form, ['adres'])['fields'], 'id'));
+
+        $context = ['URL' => ' https://example.com/kleuren ', 'Omgeving' => 'Productie', 'Environment' => 'production'];
+
+        self::assertSame('https://example.com/kleuren', IssueForms::autoValue($form['fields'][2], $context, 'URL'));
+        self::assertSame('Productie', IssueForms::autoValue($form['fields'][1], $context, 'Omgeving'));
+        self::assertSame('', IssueForms::autoValue($form['fields'][1], $context, 'Environment'), 'not one of the options');
+        self::assertSame('', IssueForms::autoValue($form['fields'][2], $context, 'No such line'));
+        self::assertSame('', IssueForms::autoValue($form['fields'][2], $context, ['not a label']));
+    }
+
     public function testWhatIsNotAnIssueFormIsRefused(): void
     {
         self::assertNull(IssueForms::parse('config.yml', 'blank_issues_enabled: false'));

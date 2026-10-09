@@ -182,6 +182,26 @@ class Reports extends Component
     }
 
     /**
+     * The forms as the reporter sees them: without the fields the site fills
+     * in itself and without the ones it leaves out.
+     *
+     * @param list<Form> $forms
+     * @return list<Form>
+     */
+    public function visibleForms(array $forms): array
+    {
+        $settings = Plugin::getInstance()?->getSettings();
+
+        if ($settings === null) {
+            return $forms;
+        }
+
+        $hidden = array_merge(array_keys($settings->autoFields), $settings->skipFields);
+
+        return array_map(static fn(array $form): array => IssueForms::without($form, $hidden), $forms);
+    }
+
+    /**
      * A captured error this user may attach a report to.
      */
     public function errorFor(?int $id): ?ReportRecord
@@ -269,10 +289,21 @@ class Reports extends Component
             throw new InvalidArgumentException(Craft::t('igotissues', 'Choose what kind of report this is.'));
         }
 
+        // Fields the site answers itself are filled from the context; fields it
+        // has no use for are left out of the issue altogether.
+        $settings = $plugin->getSettings();
+        $form = IssueForms::without($form, $settings->skipFields);
+        $context = $this->context($page, $user);
         $posted = is_array($input['fields'] ?? null) ? $input['fields'] : [];
         $values = [];
 
         foreach ($form['fields'] as $field) {
+            if (isset($settings->autoFields[$field['id']])) {
+                $values[$field['id']] = IssueForms::autoValue($field, $context, $settings->autoFields[$field['id']]);
+
+                continue;
+            }
+
             $value = is_string($posted[$field['id']] ?? null) ? trim($posted[$field['id']]) : '';
 
             if ($field['type'] === 'dropdown' && $value !== '' && !in_array($value, $field['options'], true)) {
@@ -298,8 +329,6 @@ class Reports extends Component
             'uid' => StringHelper::UUID(),
             'occurrences' => 1,
         ]);
-
-        $context = $this->context($page, $user);
 
         if ($error !== null) {
             $context['Error seen'] = sprintf('%d times, most recently %s UTC', $error->occurrences, $error->lastSeen);

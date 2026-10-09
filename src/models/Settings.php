@@ -50,6 +50,24 @@ class Settings extends Model
     /** Put the reporter's name in the issue. */
     public bool $includeReporter = true;
 
+    /**
+     * Form fields the site answers itself, as field id => the label of a line
+     * in the technical report ('URL', 'Site', 'Environment', or one the site
+     * adds through Reports::EVENT_DEFINE_CONTEXT). The reporter does not see
+     * these fields. Config file only.
+     *
+     * @var array<string, string>
+     */
+    public array $autoFields = [];
+
+    /**
+     * Form field ids that are neither shown nor put in the issue, for a field
+     * the technical report makes redundant. Config file only.
+     *
+     * @var string[]
+     */
+    public array $skipFields = [];
+
     /** Record unexpected errors in the control panel's Reports list. */
     public bool $captureErrors = true;
 
@@ -120,6 +138,7 @@ class Settings extends Model
             [['reportPermission'], 'required'],
             [['releaseFile'], 'match', 'pattern' => '#^(?!/)(?!.*\.\.)[A-Za-z0-9._/-]*$#'],
             [['position'], 'in', 'range' => self::POSITIONS],
+            [['autoFields', 'skipFields'], 'each', 'rule' => ['string']],
             [['timeout'], 'integer', 'min' => 1, 'max' => 60],
             [
                 ['autoInject', 'includeReporter', 'captureErrors', 'captureInDevMode', 'captureConsole', 'reopenOnRecurrence'],

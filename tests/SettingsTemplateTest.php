@@ -28,7 +28,14 @@ final class SettingsTemplateTest extends TestCase
         $template = self::template();
         $settings = new Settings();
 
+        // Not exposed in the control panel; config file only.
+        $skipped = ['autoFields', 'skipFields'];
+
         foreach (array_keys($settings->getAttributes()) as $attribute) {
+            if (in_array($attribute, $skipped, true)) {
+                continue;
+            }
+
             self::assertStringContainsString(
                 sprintf("name: '%s'", $attribute),
                 $template,

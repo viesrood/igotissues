@@ -144,6 +144,42 @@ final class IssueForms
     }
 
     /**
+     * The form without the given fields.
+     *
+     * @param Form $form
+     * @param array<array-key, mixed> $fieldIds
+     * @return Form
+     */
+    public static function without(array $form, array $fieldIds): array
+    {
+        $form['fields'] = array_values(array_filter(
+            $form['fields'],
+            static fn(array $field): bool => !in_array($field['id'], $fieldIds, true),
+        ));
+
+        return $form;
+    }
+
+    /**
+     * What the site itself answers for a field: the context line with the
+     * given label. A dropdown only takes one of its own options, so the issue
+     * never claims a choice the form does not offer.
+     *
+     * @param Field $field
+     * @param array<string, string> $context
+     */
+    public static function autoValue(array $field, array $context, mixed $label): string
+    {
+        $value = is_string($label) ? trim($context[$label] ?? '') : '';
+
+        if ($field['type'] === 'dropdown' && !in_array($value, $field['options'], true)) {
+            return '';
+        }
+
+        return $value;
+    }
+
+    /**
      * GitHub accepts labels as a list or as one comma-separated string.
      *
      * @return string[]

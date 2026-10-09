@@ -54,7 +54,7 @@ class ReportsController extends Controller
 
         return $this->asJson([
             'success' => true,
-            'forms' => $plugin->getGitHub()->forms(),
+            'forms' => $reports->visibleForms($plugin->getGitHub()->forms()),
             'error' => $error !== null ? ['id' => $error->id, 'title' => $error->title] : null,
             'preview' => $reports->preview($this->page(), $user, $error),
         ]);

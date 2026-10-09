@@ -1,5 +1,14 @@
 # Release Notes for I got issues
 
+## 2.1.0 - 2026-10-09
+
+### Added
+
+- `autoFields`: form fields the site fills in itself from the technical report, such as
+  the page URL or the environment. The reporter no longer sees them.
+- `skipFields`: form fields that are neither shown nor put in the issue, for a "paste your
+  log here" field the technical report makes redundant.
+
 ## 2.0.1 - 2026-10-09
 
 ### Changed
