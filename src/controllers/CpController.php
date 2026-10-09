@@ -150,7 +150,6 @@ class CpController extends Controller
                 'forms' => implode(', ', array_map(static fn(array $form): string => $form['name'], $forms)),
             ]),
             'missingLabels' => array_values(array_diff($wanted, $known)),
-            'drafts' => $this->plugin()->getDrafter()->isConfigured(),
         ]);
     }
 

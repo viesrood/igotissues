@@ -99,17 +99,6 @@ final class GitHubApi
     }
 
     /**
-     * The most recently updated open issues, pull requests left out.
-     *
-     * @return list<Issue>
-     * @throws GitHubException
-     */
-    public function openIssues(int $limit = 100): array
-    {
-        return $this->issues(['state' => 'open', 'sort' => 'updated', 'per_page' => max(1, min(100, $limit))]);
-    }
-
-    /**
      * Issues in any state that changed since the given ISO 8601 time.
      *
      * @return list<Issue>
@@ -124,15 +113,6 @@ final class GitHubApi
         }
 
         return $this->issues($query);
-    }
-
-    /**
-     * @return Issue|null Null when the issue does not exist (any more).
-     * @throws GitHubException
-     */
-    public function issue(int $number): ?array
-    {
-        return self::toIssue($this->request('GET', 'issues/' . $number, [], [404, 410]));
     }
 
     /**

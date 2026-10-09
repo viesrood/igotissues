@@ -1,6 +1,6 @@
 {
     "name": "viesrood/igotissues",
-    "description": "Report bugs and wishes from the Craft CMS control panel and front end as GitHub issues, drafted by Claude and confirmed by a human, with automatic de-duplicated error capture.",
+    "description": "Report bugs and wishes from the Craft CMS control panel and front end as GitHub issues, with a technical report attached and automatic de-duplicated error capture.",
     "type": "craft-plugin",
     "license": "MIT",
     "keywords": [
@@ -11,8 +11,7 @@
         "issues",
         "feedback",
         "bug-report",
-        "error-tracking",
-        "claude"
+        "error-tracking"
     ],
     "support": {
         "docs": "https://github.com/viesrood/igotissues/blob/main/README.md",

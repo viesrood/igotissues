@@ -15,11 +15,11 @@ use viesrood\igotissues\Plugin;
 use yii\caching\TagDependency;
 
 /**
- * The repository as the rest of the plugin sees it: its forms, labels and open
- * issues, cached, and the calls that change something.
+ * The repository as the rest of the plugin sees it: its forms and labels,
+ * cached, and the call that creates an issue.
  *
  * Reads never throw: a window that cannot reach GitHub still opens, with the
- * built-in forms and no duplicates. Writes do throw, because the reporter must
+ * built-in forms. Writes do throw, because the reporter must
  * hear that nothing was sent.
  *
  * @phpstan-import-type Form from IssueForms
@@ -29,7 +29,6 @@ class GitHub extends Component
 {
     private const FORMS_TTL = 3600;
     private const LABELS_TTL = 3600;
-    private const ISSUES_TTL = 300;
 
     public function isConfigured(): bool
     {
@@ -94,29 +93,13 @@ class GitHub extends Component
     }
 
     /**
-     * @return list<Issue>
-     */
-    public function openIssues(): array
-    {
-        /** @var list<Issue> $issues */
-        $issues = $this->cached('open-issues', self::ISSUES_TTL, fn(): array => $this->api()->openIssues());
-
-        return $issues;
-    }
-
-    /**
      * @param string[] $labels
      * @return Issue
      * @throws GitHubException
      */
     public function createIssue(string $title, string $body, array $labels): array
     {
-        $issue = $this->api()->createIssue($title, $body, $labels);
-
-        // So the next draft can already name this one as a duplicate.
-        Craft::$app->getCache()->delete($this->key('open-issues'));
-
-        return $issue;
+        return $this->api()->createIssue($title, $body, $labels);
     }
 
     public function clearCache(): void

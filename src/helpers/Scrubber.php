@@ -8,7 +8,7 @@ namespace viesrood\igotissues\helpers;
  * Removes secrets and installation paths from text before it leaves the site.
  *
  * Everything a report carries (an error message, a stack trace, a page URL)
- * ends up at GitHub and, for a draft, at the Claude API. None of it should
+ * ends up at GitHub. None of it should
  * carry a credential or reveal where the site lives on disk.
  */
 final class Scrubber

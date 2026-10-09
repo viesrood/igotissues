@@ -35,15 +35,6 @@ class Settings extends Model
      */
     public string $githubApiUrl = self::GITHUB_API;
 
-    /** Anthropic API key. Empty means no drafts; reporting still works. */
-    public string $anthropicApiKey = '$IGOTISSUES_ANTHROPIC_KEY';
-
-    /** The Claude model that drafts an issue from what the reporter typed. */
-    public string $model = 'claude-opus-5-5';
-
-    /** Extra instructions for the draft, e.g. the language to write in. */
-    public string $draftInstructions = '';
-
     /** The Craft permission a user needs to report. Admins always may. */
     public string $reportPermission = 'accessCp';
 
@@ -117,29 +108,16 @@ class Settings extends Model
         return rtrim($url, '/') . '/';
     }
 
-    /** The resolved Anthropic API key ('' when unset). */
-    public function getParsedAnthropicApiKey(): string
-    {
-        return self::resolved($this->anthropicApiKey);
-    }
-
     public function hasGitHub(): bool
     {
         return $this->getParsedGithubToken() !== '' && $this->getParsedGithubRepo() !== '';
     }
 
-    public function hasDrafts(): bool
-    {
-        return $this->getParsedAnthropicApiKey() !== '' && trim($this->model) !== '';
-    }
-
     public function rules(): array
     {
         return [
-            [['githubToken', 'githubRepo', 'githubApiUrl', 'anthropicApiKey', 'model', 'reportPermission', 'releaseFile'], 'string', 'max' => 255],
-            [['draftInstructions'], 'string', 'max' => 2000],
-            [['model', 'reportPermission'], 'required'],
-            [['model'], 'match', 'pattern' => '/^[a-z0-9.-]+$/'],
+            [['githubToken', 'githubRepo', 'githubApiUrl', 'reportPermission', 'releaseFile'], 'string', 'max' => 255],
+            [['reportPermission'], 'required'],
             [['releaseFile'], 'match', 'pattern' => '#^(?!/)(?!.*\.\.)[A-Za-z0-9._/-]*$#'],
             [['position'], 'in', 'range' => self::POSITIONS],
             [['timeout'], 'integer', 'min' => 1, 'max' => 60],

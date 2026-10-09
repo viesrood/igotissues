@@ -256,18 +256,42 @@
   resize: vertical;
 }
 
-#igotissues .igi-duplicates {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin: 0;
-  padding: 10px 12px;
+#igotissues .igi-details {
   border: 1px solid var(--igi-line);
   border-radius: 6px;
+  padding: 8px 12px;
 }
 
-#igotissues .igi-duplicates legend {
-  padding: 0 4px;
+#igotissues .igi-details summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--igi-ink);
+}
+
+#igotissues .igi-details[open] summary {
+  margin-bottom: 8px;
+}
+
+#igotissues .igi-preview {
+  max-height: 220px;
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  overflow: auto;
+  border-radius: 6px;
+  background: var(--igi-soft);
+  color: var(--igi-ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+#igotissues .igi-error-title {
+  display: block;
+  color: var(--igi-muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
 }
 
 #igotissues .igi-choice {
@@ -371,6 +395,8 @@
 #igotissues input:focus-visible,
 #igotissues select:focus-visible,
 #igotissues textarea:focus-visible,
+#igotissues summary:focus-visible,
+#igotissues .igi-preview:focus-visible,
 #igotissues .igi-message:focus-visible {
   outline: 2px solid var(--igi-focus);
   outline-offset: 2px;

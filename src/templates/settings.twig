@@ -61,37 +61,6 @@
     errors: settings.getErrors('timeout'),
 }) }}
 
-<h2>{{ 'Drafts by Claude'|t('igotissues') }}</h2>
-
-{{ forms.autosuggestField({
-    label: 'Anthropic API key'|t('igotissues'),
-    instructions: 'With a key, Claude writes a first version of each report for the reporter to check. Without one, reporting works the same with an empty form.'|t('igotissues'),
-    id: 'anthropicApiKey',
-    name: 'anthropicApiKey',
-    value: settings.anthropicApiKey,
-    suggestEnvVars: true,
-    errors: settings.getErrors('anthropicApiKey'),
-}) }}
-
-{{ forms.textField({
-    label: 'Model'|t('igotissues'),
-    instructions: 'The Claude model id that writes the draft.'|t('igotissues'),
-    id: 'model',
-    name: 'model',
-    value: settings.model,
-    errors: settings.getErrors('model'),
-}) }}
-
-{{ forms.textareaField({
-    label: 'Instructions for the draft'|t('igotissues'),
-    instructions: 'How issues are written on this project, for example the language to write in.'|t('igotissues'),
-    id: 'draftInstructions',
-    name: 'draftInstructions',
-    rows: 4,
-    value: settings.draftInstructions,
-    errors: settings.getErrors('draftInstructions'),
-}) }}
-
 <h2>{{ 'Reporting'|t('igotissues') }}</h2>
 
 {{ forms.textField({
@@ -183,10 +152,6 @@
 
                 if (data.success && data.missingLabels && data.missingLabels.length) {
                     lines.push({{ 'These labels from the forms do not exist in the repository and will be left off:'|t('igotissues')|json_encode|raw }} + ' ' + data.missingLabels.join(', '));
-                }
-
-                if (data.success && !data.drafts) {
-                    lines.push({{ 'No Anthropic API key is set, so reports start from an empty form.'|t('igotissues')|json_encode|raw }});
                 }
 
                 result.textContent = lines.join(' ');

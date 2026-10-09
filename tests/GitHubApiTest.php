@@ -65,8 +65,9 @@ final class GitHubApiTest extends TestCase
             ['number' => 2, 'title' => 'PR', 'html_url' => 'u2', 'state' => 'open', 'pull_request' => ['url' => 'x']],
         ])]);
 
-        self::assertSame([1], array_column($api->openIssues(), 'number'));
-        self::assertStringContainsString('state=open', $this->request()->getUri()->getQuery());
+        self::assertSame([1], array_column($api->issuesSince('2026-10-01T00:00:00Z'), 'number'));
+        self::assertStringContainsString('state=all', $this->request()->getUri()->getQuery());
+        self::assertStringContainsString('since=2026-10-01', $this->request()->getUri()->getQuery());
     }
 
     public function testIssueFormsAreReadAndTheChooserConfigIsSkipped(): void
@@ -90,11 +91,6 @@ final class GitHubApiTest extends TestCase
     public function testARepositoryWithoutFormsHasNone(): void
     {
         self::assertSame([], $this->api([self::json(['message' => 'Not Found'], 404)])->issueForms());
-    }
-
-    public function testAnIssueThatIsGoneIsNull(): void
-    {
-        self::assertNull($this->api([self::json(['message' => 'Not Found'], 404)])->issue(7));
     }
 
     public function testReopeningPatchesTheState(): void

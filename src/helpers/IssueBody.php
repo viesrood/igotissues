@@ -35,10 +35,10 @@ final class IssueBody
 
     /**
      * @param Form $form
-     * @param array<string, string> $values Field id => what the reporter confirmed.
-     * @param array<string, string> $context Label => value, shown folded.
+     * @param array<string, string> $values Field id => what the reporter wrote.
+     * @param string $report The technical report, see technicalReport().
      */
-    public static function render(array $form, array $values, array $context, string $marker, string $error = ''): string
+    public static function render(array $form, array $values, string $report, string $marker): string
     {
         $parts = [];
 
@@ -47,30 +47,77 @@ final class IssueBody
             $parts[] = '### ' . $field['label'] . "\n\n" . ($value !== '' ? $value : self::NO_RESPONSE);
         }
 
-        if (trim($error) !== '') {
-            $parts[] = "### Error\n\n" . self::codeBlock($error);
+        if ($report !== '') {
+            $parts[] = $report;
         }
 
-        if ($context !== []) {
-            $parts[] = self::context($context);
+        if ($marker !== '') {
+            $parts[] = $marker;
         }
-
-        $parts[] = $marker;
 
         return implode("\n\n", $parts) . "\n";
     }
 
     /**
-     * A comment on an existing issue: the same content, without the form's
-     * headings pretending to be a new issue.
+     * What goes along with a report without the reporter typing it, folded
+     * away under the issue: what the server knows, the server error the
+     * reporter ran into, and what the browser saw just before.
      *
-     * @param Form $form
-     * @param array<string, string> $values
+     * @param array<string, string> $context Label => value.
+     */
+    public static function technicalReport(array $context, string $browser = '', string $error = ''): string
+    {
+        $parts = [];
+        $table = self::table($context);
+
+        if ($table !== '') {
+            $parts[] = $table;
+        }
+
+        if (trim($error) !== '') {
+            $parts[] = "**Server error**\n\n" . self::codeBlock($error);
+        }
+
+        if (trim($browser) !== '') {
+            $parts[] = "**In the browser, before the report**\n\n" . self::codeBlock($browser);
+        }
+
+        if ($parts === []) {
+            return '';
+        }
+
+        return "<details>\n<summary>Technical report</summary>\n\n" . implode("\n\n", $parts) . "\n\n</details>";
+    }
+
+    /**
+     * The same report as plain text, for showing the reporter what is sent.
+     *
      * @param array<string, string> $context
      */
-    public static function comment(array $form, array $values, array $context, string $marker, string $error = ''): string
+    public static function plainReport(array $context, string $browser = '', string $error = ''): string
     {
-        return "**Reported again from the site.**\n\n" . self::render($form, $values, $context, $marker, $error);
+        $parts = [];
+        $lines = [];
+
+        foreach ($context as $label => $value) {
+            if (trim($value) !== '') {
+                $lines[] = $label . ': ' . trim($value);
+            }
+        }
+
+        if ($lines !== []) {
+            $parts[] = implode("\n", $lines);
+        }
+
+        if (trim($error) !== '') {
+            $parts[] = "Server error\n" . trim($error);
+        }
+
+        if (trim($browser) !== '') {
+            $parts[] = "In the browser, before the report\n" . trim($browser);
+        }
+
+        return implode("\n\n", $parts);
     }
 
     /**
@@ -101,7 +148,7 @@ final class IssueBody
     /**
      * @param array<string, string> $context
      */
-    public static function context(array $context): string
+    public static function table(array $context): string
     {
         $rows = [];
 
@@ -115,11 +162,7 @@ final class IssueBody
             $rows[] = '| ' . self::cell((string)$label) . ' | ' . self::cell($value) . ' |';
         }
 
-        if ($rows === []) {
-            return '';
-        }
-
-        return "<details>\n<summary>Context</summary>\n\n| | |\n|---|---|\n" . implode("\n", $rows) . "\n\n</details>";
+        return $rows === [] ? '' : "| | |\n|---|---|\n" . implode("\n", $rows);
     }
 
     /**

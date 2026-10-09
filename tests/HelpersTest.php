@@ -220,10 +220,15 @@ final class HelpersTest extends TestCase
         $form = IssueForms::parse('fout.yml', self::FORM);
         self::assertNotNull($form);
 
+        $report = IssueBody::technicalReport(
+            ['URL' => 'https://example.com/a|b', 'Empty' => ''],
+            "12:00:01  error    TypeError: x is undefined",
+            "RuntimeException: boom\n\n#0 modules/a.php:3",
+        );
         $body = IssueBody::render(
             $form,
             ['gebeurde' => 'De pagina bleef wit.', 'omgeving' => 'Productie'],
-            ['URL' => 'https://example.com/a|b', 'Empty' => ''],
+            $report,
             IssueBody::marker('1b2c-3d', 'abc123'),
         );
 
@@ -232,6 +237,24 @@ final class HelpersTest extends TestCase
         self::assertStringContainsString('| URL | https://example.com/a\|b |', $body);
         self::assertStringNotContainsString('Empty', $body);
         self::assertStringEndsWith("<!-- igotissues:1b2c-3d fp:abc123 -->\n", $body);
+    }
+
+    public function testTheTechnicalReportIsFoldedAwayUnderWhatTheReporterWrote(): void
+    {
+        $report = IssueBody::technicalReport(['Craft' => '5.11'], '12:00:01  click    button "Save"', 'RuntimeException: boom');
+
+        self::assertStringStartsWith("<details>\n<summary>Technical report</summary>", $report);
+        self::assertStringEndsWith('</details>', $report);
+        self::assertStringContainsString("**Server error**\n\n```\nRuntimeException: boom\n```", $report);
+        self::assertStringContainsString("**In the browser, before the report**\n\n```\n12:00:01  click", $report);
+        self::assertSame('', IssueBody::technicalReport(['Empty' => ''], ' ', ''));
+    }
+
+    public function testTheReporterCanReadTheSameReportAsPlainText(): void
+    {
+        $plain = IssueBody::plainReport(['Craft' => '5.11', 'Empty' => ''], 'click', 'RuntimeException: boom');
+
+        self::assertSame("Craft: 5.11\n\nServer error\nRuntimeException: boom\n\nIn the browser, before the report\nclick", $plain);
     }
 
     public function testTheTitleGetsTheFormPrefixOnce(): void
@@ -260,7 +283,6 @@ final class HelpersTest extends TestCase
 
         self::assertSame('$IGOTISSUES_GITHUB_TOKEN', $settings->githubToken);
         self::assertSame('$IGOTISSUES_GITHUB_REPO', $settings->githubRepo);
-        self::assertSame('$IGOTISSUES_ANTHROPIC_KEY', $settings->anthropicApiKey);
         self::assertFalse($settings->captureInDevMode);
         self::assertFalse($settings->autoInject);
     }

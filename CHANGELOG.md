@@ -1,5 +1,25 @@
 # Release Notes for I got issues
 
+## 2.0.0 - 2026-10-09
+
+### Removed
+
+- **Drafts by Claude.** The plugin no longer talks to any AI service. The settings
+  `anthropicApiKey`, `model` and `draftInstructions` are gone; remove them from
+  `config/igotissues.php`, where an unknown setting is an error.
+- Pointing a report at an open issue it duplicates. That depended on the draft.
+
+### Changed
+
+- The window opens straight on the repository's issue form.
+- **Every report carries a technical report**, folded away under the issue: the page and
+  the installation (now with the database and every plugin's version), the server error
+  the reporter just ran into, and what the browser saw before the report (script errors,
+  failed requests, `console.error` messages and the last clicks). The window shows it
+  under "What is sent along" before anything is sent.
+- A server error the reporter ran into in the last ten minutes is attached by itself,
+  with a checkbox to leave it out.
+
 ## 1.0.0 - 2026-10-09
 
 ### Added

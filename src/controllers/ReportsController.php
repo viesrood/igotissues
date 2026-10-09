@@ -9,9 +9,7 @@ use craft\elements\User;
 use craft\web\Controller;
 use InvalidArgumentException;
 use Throwable;
-use viesrood\igotissues\helpers\Drafting;
 use viesrood\igotissues\helpers\RateLimit;
-use viesrood\igotissues\helpers\Scrubber;
 use viesrood\igotissues\Plugin;
 use yii\web\ForbiddenHttpException;
 use yii\web\Response;
@@ -19,16 +17,13 @@ use yii\web\Response;
 /**
  * Backend of the report window, for the control panel and the front end alike.
  *
- * Credentials never leave the server, and neither does anything GitHub or the
- * Claude API said in an error: the browser gets a generic sentence, the log
- * gets the detail.
+ * Credentials never leave the server, and neither does anything GitHub said
+ * in an error: the browser gets a generic sentence, the log gets the detail.
  */
 class ReportsController extends Controller
 {
-    /** Drafts and reports per minute per user. A person needs one or two. */
+    /** Reports per minute per user. A person needs one or two. */
     private const RATE_LIMIT = 10;
-
-    private const REPORT_LENGTH = 5000;
 
     public function beforeAction($action): bool
     {
@@ -47,53 +42,26 @@ class ReportsController extends Controller
     }
 
     /**
-     * The forms of the repository and a first version of the report.
+     * What the window needs to open: the forms of the repository, the error
+     * this user just ran into, and the technical report that would go along.
      */
-    public function actionDraft(): Response
+    public function actionForms(): Response
     {
         $user = $this->user();
-
-        if (!RateLimit::hit('draft', (int)$user->id, self::RATE_LIMIT)) {
-            return $this->failure(Craft::t('igotissues', 'Too many requests. Wait a moment and try again.'), 429);
-        }
-
         $plugin = $this->plugin();
         $reports = $plugin->getReports();
-        $error = $reports->errorFor($this->reportId());
-        $text = Scrubber::limit(trim((string)$this->request->getBodyParam('text', '')), self::REPORT_LENGTH);
-
-        if ($error === null && mb_strlen($text) < 3) {
-            return $this->failure(Craft::t('igotissues', 'Tell us a little more first.'));
-        }
-
-        $github = $plugin->getGitHub();
-        $forms = $github->forms();
-        $labels = $github->labels();
-        $draft = null;
-
-        if ($plugin->getDrafter()->isConfigured()) {
-            $page = $reports->context($this->page(), null);
-
-            $draft = $plugin->getDrafter()->draft(
-                $reports->scrub($text),
-                $forms,
-                $labels,
-                $github->openIssues(),
-                array_intersect_key($page, ['URL' => true, 'Page title' => true, 'Site' => true, 'JavaScript errors' => true]),
-                $reports->errorText($error),
-            );
-        }
+        $error = $reports->errorFor($this->reportId()) ?? $reports->recentErrorFor($user);
 
         return $this->asJson([
             'success' => true,
-            'drafted' => $draft !== null,
-            'draft' => $draft ?? Drafting::blank($forms, $text !== '' ? $text : (string)$error?->title),
-            'forms' => $forms,
+            'forms' => $plugin->getGitHub()->forms(),
+            'error' => $error !== null ? ['id' => $error->id, 'title' => $error->title] : null,
+            'preview' => $reports->preview($this->page(), $user, $error),
         ]);
     }
 
     /**
-     * Send the confirmed report to GitHub.
+     * Send the report to GitHub.
      */
     public function actionSend(): Response
     {
@@ -108,8 +76,6 @@ class ReportsController extends Controller
                 'form' => $this->request->getBodyParam('form'),
                 'title' => $this->request->getBodyParam('title'),
                 'fields' => $this->request->getBodyParam('fields'),
-                'labels' => $this->request->getBodyParam('labels'),
-                'duplicateOf' => $this->request->getBodyParam('duplicateOf'),
                 'reportId' => $this->reportId(),
             ], $this->page());
         } catch (InvalidArgumentException $e) {

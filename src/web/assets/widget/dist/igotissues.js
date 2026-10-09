@@ -5,6 +5,11 @@
  * #igotissues element the plugin renders, builds the button and the dialog,
  * and talks to the plugin's own endpoints. Works the same in the Craft control
  * panel and on any front-end template.
+ *
+ * From the moment it loads it also keeps a short log of what goes wrong on the
+ * page (script errors, failed requests, console errors) and of the last
+ * clicks. That log goes along with a report as its technical details, and the
+ * reporter can read it before sending.
  */
 (function () {
   'use strict';
@@ -30,26 +35,132 @@
   root.setAttribute('data-ready', '1');
 
   var t = config.t || {};
-  var jsErrors = [];
-  var state = { step: 'compose', text: '', error: null, forms: [], draft: null, returnFocus: null };
+  var MAX_EVENTS = 30;
+  var events = [];
+  var state = { step: 'form', loaded: false, error: null, includeError: true, forms: [], preview: '', draft: null, returnFocus: null };
   var requestId = 0;
 
-  // Collected from the moment the script runs, so a report can say what broke.
-  window.addEventListener('error', function (event) {
-    remember((event.message || 'Error') + (event.filename ? ' (' + event.filename + ':' + event.lineno + ')' : ''));
-  });
-  window.addEventListener('unhandledrejection', function (event) {
-    var reason = event.reason;
-    remember('Unhandled rejection: ' + (reason && reason.message ? reason.message : String(reason)));
-  });
+  // ---------------------------------------------------------------- the log
 
-  function remember(message) {
-    jsErrors.push(String(message).slice(0, 300));
+  function remember(type, text) {
+    var now = new Date();
 
-    if (jsErrors.length > 5) {
-      jsErrors.shift();
+    events.push({
+      time: [now.getHours(), now.getMinutes(), now.getSeconds()].map(function (n) {
+        return (n < 10 ? '0' : '') + n;
+      }).join(':'),
+      type: type,
+      text: String(text).replace(/\s+/g, ' ').slice(0, 300)
+    });
+
+    if (events.length > MAX_EVENTS) {
+      events.shift();
     }
   }
+
+  // Our own requests are not part of what happened on the page.
+  function isOwn(url) {
+    return String(url).indexOf('igotissues/reports/') !== -1;
+  }
+
+  // The path is enough to recognise a request; the query can carry anything.
+  function shortUrl(url) {
+    try {
+      var parsed = new URL(String(url), window.location.href);
+
+      return (parsed.origin === window.location.origin ? '' : parsed.origin) + parsed.pathname;
+    } catch (e) {
+      return String(url).split('?')[0];
+    }
+  }
+
+  remember('page', window.location.pathname);
+
+  window.addEventListener('error', function (event) {
+    if (event.message) {
+      remember('error', event.message + (event.filename ? ' (' + shortUrl(event.filename) + ':' + event.lineno + ')' : ''));
+    } else if (event.target && event.target !== window && (event.target.src || event.target.href)) {
+      // A script, stylesheet or image that failed to load.
+      remember('request', 'failed to load ' + shortUrl(event.target.src || event.target.href));
+    }
+  }, true);
+
+  window.addEventListener('unhandledrejection', function (event) {
+    var reason = event.reason;
+
+    remember('error', 'Unhandled rejection: ' + (reason && reason.message ? reason.message : String(reason)));
+  });
+
+  if (window.console && typeof window.console.error === 'function') {
+    var consoleError = window.console.error;
+
+    window.console.error = function () {
+      try {
+        remember('console', Array.prototype.map.call(arguments, function (argument) {
+          return argument && argument.message ? argument.message : String(argument);
+        }).join(' '));
+      } catch (e) {
+        // Logging must never break the page it is watching.
+      }
+
+      return consoleError.apply(this, arguments);
+    };
+  }
+
+  if (typeof window.fetch === 'function') {
+    var nativeFetch = window.fetch;
+
+    window.fetch = function (input, init) {
+      var url = typeof input === 'string' ? input : (input && input.url) || '';
+      var method = ((init && init.method) || (input && input.method) || 'GET').toUpperCase();
+      var promise = nativeFetch.apply(this, arguments);
+
+      if (!isOwn(url)) {
+        promise.then(function (response) {
+          if (response.status >= 400) {
+            remember('request', method + ' ' + shortUrl(url) + ' returned ' + response.status);
+          }
+        }, function () {
+          remember('request', method + ' ' + shortUrl(url) + ' failed');
+        });
+      }
+
+      return promise;
+    };
+  }
+
+  if (window.XMLHttpRequest) {
+    var open = window.XMLHttpRequest.prototype.open;
+
+    window.XMLHttpRequest.prototype.open = function (method, url) {
+      var request = this;
+
+      if (!isOwn(url)) {
+        request.addEventListener('loadend', function () {
+          if (request.status === 0 || request.status >= 400) {
+            remember('request', String(method).toUpperCase() + ' ' + shortUrl(url) + (request.status ? ' returned ' + request.status : ' failed'));
+          }
+        });
+      }
+
+      return open.apply(this, arguments);
+    };
+  }
+
+  // What was clicked, never what was typed.
+  document.addEventListener('click', function (event) {
+    var target = event.target && event.target.closest ? event.target.closest('a, button, [role="button"], input[type="submit"], summary') : null;
+
+    if (!target || root.contains(target)) {
+      return;
+    }
+
+    var label = (target.getAttribute('aria-label') || target.textContent || target.value || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+
+    remember('click', target.tagName.toLowerCase() + (target.id ? '#' + target.id : '') + (label ? ' "' + label + '"' : ''));
+  }, true);
+
+  // ------------------------------------------------------------- helpers
 
   function el(tag, attrs, children) {
     var node = document.createElement(tag);
@@ -114,35 +225,38 @@
       url: window.location.href,
       title: document.title,
       viewport: window.innerWidth + ' x ' + window.innerHeight,
-      jsErrors: jsErrors.slice()
+      language: navigator.language || '',
+      events: events.slice()
     };
   }
 
-  // The button
+  // ---------------------------------------------------------- the button
 
   var launcher = el('button', {
     type: 'button',
     class: 'igi-launcher igi-' + (config.position || 'bottom-right'),
     'aria-haspopup': 'dialog',
     onclick: function () {
-      open(config.recentError || null);
+      openWindow(null);
     }
   }, [
     el('span', { class: 'igi-launcher-mark', 'aria-hidden': 'true', text: '!' }),
     el('span', { class: 'igi-launcher-label', text: t.button })
   ]);
 
-  if (config.recentError) {
-    launcher.classList.add('igi-has-error');
-    launcher.querySelector('.igi-launcher-label').textContent = t.recentError;
+  function alertLauncher(on) {
+    launcher.classList.toggle('igi-has-error', on);
+    launcher.querySelector('.igi-launcher-label').textContent = on ? t.recentError : t.button;
   }
 
-  // The dialog
+  alertLauncher(!!config.recentError);
+
+  // ---------------------------------------------------------- the dialog
 
   var body = el('div', { class: 'igi-body' });
   var message = el('p', { class: 'igi-message', role: 'alert', tabindex: '-1', hidden: 'hidden' });
-  var tabNew = el('button', { type: 'button', class: 'igi-tab', text: t.newReport, onclick: function () { show('compose'); } });
-  var tabMine = el('button', { type: 'button', class: 'igi-tab', text: t.mine, onclick: function () { show('mine'); } });
+  var tabNew = el('button', { type: 'button', class: 'igi-tab', text: t.newReport, onclick: function () { collect(); show('form'); } });
+  var tabMine = el('button', { type: 'button', class: 'igi-tab', text: t.mine, onclick: function () { collect(); show('mine'); } });
 
   var dialog = el('div', {
     class: 'igi-dialog igi-' + (config.position || 'bottom-right'),
@@ -179,7 +293,7 @@
     }
 
     // Keep focus inside the dialog while it is open.
-    var focusable = dialog.querySelectorAll('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled])');
+    var focusable = dialog.querySelectorAll('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary');
 
     if (!focusable.length) {
       return;
@@ -197,15 +311,27 @@
     }
   });
 
-  function open(error) {
-    state.returnFocus = (error && error.returnFocus) || document.activeElement || launcher;
-    state.error = error && error.id ? { id: error.id, title: error.title || '' } : null;
+  // `about` is an error to report on: { id, title }. Without it the server
+  // looks for one this user ran into moments ago.
+  function openWindow(about) {
+    state.returnFocus = (about && about.returnFocus) || document.activeElement || launcher;
     dialog.hidden = false;
     backdrop.hidden = false;
-    show('compose');
+
+    if (about && about.id) {
+      state.loaded = false;
+      state.draft = null;
+    }
+
+    if (state.loaded) {
+      show('form');
+    } else {
+      load(about && about.id ? about.id : null);
+    }
   }
 
   function close() {
+    collect();
     requestId++;
     dialog.hidden = true;
     backdrop.hidden = true;
@@ -229,12 +355,12 @@
     tabNew.setAttribute('aria-pressed', step === 'mine' ? 'false' : 'true');
     tabMine.setAttribute('aria-pressed', step === 'mine' ? 'true' : 'false');
 
-    if (step === 'compose') {
-      compose();
-    } else if (step === 'review') {
-      review();
-    } else if (step === 'mine') {
+    if (step === 'mine') {
       mine();
+    } else if (state.loaded) {
+      form();
+    } else {
+      load(null);
     }
   }
 
@@ -243,106 +369,75 @@
     body.appendChild(el('p', { class: 'igi-busy', role: 'status', text: text }));
   }
 
-  // Step 1: say it in your own words
+  // The forms of the repository, and what would be sent along from this page.
+  function load(errorId) {
+    var current = ++requestId;
 
-  function compose() {
-    var textarea = el('textarea', { id: 'igi-text', class: 'igi-input', rows: '6', maxlength: '5000' });
-    textarea.value = state.text;
+    state.step = 'form';
+    busy(t.loading);
 
-    var form = el('form', {
-      class: 'igi-form',
-      onsubmit: function (event) {
-        event.preventDefault();
-        state.text = textarea.value.trim();
-
-        if (!state.error && state.text.length < 3) {
-          textarea.focus();
-
-          return;
-        }
-
-        draft();
-      }
-    }, [
-      state.error ? el('p', { class: 'igi-about' }, [
-        el('strong', { text: t.aboutError + ' ' }),
-        el('span', { text: state.error.title })
-      ]) : null,
-      el('label', { class: 'igi-label', for: 'igi-text', text: t.prompt }),
-      textarea,
-      el('p', { class: 'igi-help', text: config.drafts ? t.promptHelp : t.promptHelpPlain }),
-      el('div', { class: 'igi-actions' }, [
-        el('button', { type: 'submit', class: 'igi-primary', text: t.continue })
-      ])
-    ]);
-
-    body.appendChild(form);
-    textarea.focus();
-  }
-
-  function draft() {
-    var mine = ++requestId;
-
-    busy(config.drafts ? t.drafting : t.loading);
-
-    post(config.urls.draft, { text: state.text, page: page(), reportId: state.error ? state.error.id : null })
+    post(config.urls.forms, { page: page(), reportId: errorId })
       .then(function (data) {
-        if (mine !== requestId) {
+        if (current !== requestId) {
           return;
         }
 
         state.forms = data.forms || [];
-        state.draft = data.draft || { form: '', title: '', fields: {}, labels: [], duplicates: [] };
-        show('review');
+        state.preview = data.preview || '';
+        state.error = data.error || null;
+        state.includeError = true;
+        state.loaded = true;
+        state.draft = state.draft || { form: state.forms.length ? state.forms[0].id : '', title: '', fields: {} };
+        show('form');
       })
       .catch(function (error) {
-        if (mine !== requestId) {
+        if (current !== requestId) {
           return;
         }
 
-        show('compose');
+        body.textContent = '';
         fail(error.message);
       });
   }
 
-  // Step 2: check what will be sent
+  // -------------------------------------------------------------- the form
 
   function currentForm() {
     var found = null;
 
-    state.forms.forEach(function (form) {
-      if (form.id === state.draft.form) {
-        found = form;
+    state.forms.forEach(function (candidate) {
+      if (candidate.id === state.draft.form) {
+        found = candidate;
       }
     });
 
     return found || state.forms[0] || null;
   }
 
-  function review() {
-    var form = currentForm();
+  function form() {
+    var chosen = currentForm();
 
-    if (!form) {
-      show('compose');
+    if (!chosen) {
       fail(t.failed);
 
       return;
     }
 
-    state.draft.form = form.id;
+    state.draft.form = chosen.id;
 
     var kind = el('select', {
       id: 'igi-kind',
       class: 'igi-input',
       onchange: function () {
         collect();
-        carryOver(form, kind.value);
+        carryOver(chosen, kind.value);
         state.draft.form = kind.value;
-        show('review');
+        show('form');
+        document.getElementById('igi-kind').focus();
       }
     }, state.forms.map(function (option) {
       var node = el('option', { value: option.id, text: option.name });
-      node.selected = option.id === form.id;
+      node.selected = option.id === chosen.id;
 
       return node;
     }));
@@ -350,7 +445,7 @@
     var title = el('input', { id: 'igi-issue-title', class: 'igi-input', type: 'text', maxlength: '200', required: 'required' });
     title.value = state.draft.title || '';
 
-    var fields = form.fields.map(function (field) {
+    var fields = chosen.fields.map(function (field) {
       var id = 'igi-field-' + field.id;
       var value = (state.draft.fields || {})[field.id] || '';
       var input;
@@ -390,11 +485,22 @@
       ]);
     });
 
-    var duplicates = (state.draft.duplicates || []).length ? el('fieldset', { class: 'igi-duplicates' }, [
-      el('legend', { class: 'igi-label', text: t.duplicates })
-    ].concat(state.draft.duplicates.map(function (duplicate) {
-      return duplicateChoice(duplicate.number, fill(t.sameAs, { number: duplicate.number }), duplicate);
-    })).concat([duplicateChoice(0, t.newIssue, null)])) : null;
+    var include = null;
+
+    if (state.error) {
+      var checkbox = el('input', { type: 'checkbox', id: 'igi-include-error' });
+      checkbox.checked = state.includeError;
+
+      include = el('div', { class: 'igi-about' }, [
+        el('div', { class: 'igi-choice' }, [
+          checkbox,
+          el('label', { for: 'igi-include-error' }, [
+            el('strong', { text: t.includeError }),
+            el('span', { class: 'igi-error-title', text: state.error.title })
+          ])
+        ])
+      ]);
+    }
 
     var submit = el('button', { type: 'submit', class: 'igi-primary', text: t.send });
 
@@ -406,7 +512,8 @@
         send(submit);
       }
     }, [
-      el('p', { class: 'igi-help', text: t.review }),
+      el('p', { class: 'igi-help', text: t.intro }),
+      include,
       state.forms.length > 1 ? el('div', { class: 'igi-field' }, [
         el('label', { class: 'igi-label', for: 'igi-kind', text: t.kind }),
         kind
@@ -419,52 +526,38 @@
         title
       ])
     ].concat(fields).concat([
-      duplicates,
-      el('div', { class: 'igi-actions' }, [
-        el('button', { type: 'button', class: 'igi-secondary', text: t.back, onclick: function () { collect(); show('compose'); } }),
-        submit
-      ])
+      el('details', { class: 'igi-details' }, [
+        el('summary', { text: t.whatIsSent }),
+        el('p', { class: 'igi-help', text: t.whatIsSentHelp }),
+        el('pre', { class: 'igi-preview', tabindex: '0', text: state.preview })
+      ]),
+      el('div', { class: 'igi-actions' }, [submit])
     ]));
 
     body.appendChild(node);
     title.focus();
   }
 
-  function duplicateChoice(number, label, duplicate) {
-    var id = 'igi-duplicate-' + number;
-    var input = el('input', { type: 'radio', name: 'igi-duplicate', id: id, value: String(number) });
-    input.checked = (state.draft.duplicateOf || 0) === number;
-
-    return el('div', { class: 'igi-choice' }, [
-      input,
-      el('label', { for: id }, [
-        document.createTextNode(label),
-        duplicate ? el('span', { class: 'igi-help' }, [
-          document.createTextNode(' '),
-          el('a', { href: duplicate.url, target: '_blank', rel: 'noopener', text: duplicate.title }),
-          document.createTextNode(duplicate.reason ? ' · ' + duplicate.reason : '')
-        ]) : null
-      ])
-    ]);
-  }
-
-  // Read the review form back into the draft, so nothing typed is lost when
-  // the reporter goes back or picks another kind of report.
+  // Read the form back into the draft, so nothing typed is lost when the
+  // window is closed, a tab is switched or another kind of report is picked.
   function collect() {
     var title = document.getElementById('igi-issue-title');
-    var chosen = body.querySelector('input[name="igi-duplicate"]:checked');
+    var include = document.getElementById('igi-include-error');
 
-    if (title) {
-      state.draft.title = title.value.trim();
+    if (!state.draft || !title) {
+      return;
     }
 
+    state.draft.title = title.value.trim();
     state.draft.fields = state.draft.fields || {};
 
     Array.prototype.forEach.call(body.querySelectorAll('[data-field]'), function (input) {
       state.draft.fields[input.getAttribute('data-field')] = input.value;
     });
 
-    state.draft.duplicateOf = chosen ? parseInt(chosen.value, 10) : 0;
+    if (include) {
+      state.includeError = include.checked;
+    }
   }
 
   // Another form has other fields. Move what was written into its first
@@ -472,20 +565,15 @@
   function carryOver(from, toId) {
     var to = null;
 
-    state.forms.forEach(function (form) {
-      if (form.id === toId) {
-        to = form;
+    state.forms.forEach(function (candidate) {
+      if (candidate.id === toId) {
+        to = candidate;
       }
     });
 
     if (!to || to.id === from.id) {
       return;
     }
-
-    // The old form's own labels go with it; the new form brings its own.
-    state.draft.labels = (state.draft.labels || []).filter(function (label) {
-      return (from.labels || []).indexOf(label) === -1;
-    });
 
     var known = {};
     var text = [];
@@ -499,6 +587,7 @@
 
       if (value && !known[field.id] && field.type !== 'dropdown') {
         text.push(value);
+        state.draft.fields[field.id] = '';
       }
     });
 
@@ -514,38 +603,40 @@
   }
 
   function send(submit) {
-    var mine = ++requestId;
+    var current = ++requestId;
+    var chosen = currentForm();
+    var fields = {};
+
+    // Only the fields of the form that is sent.
+    chosen.fields.forEach(function (field) {
+      fields[field.id] = state.draft.fields[field.id] || '';
+    });
 
     submit.disabled = true;
     submit.textContent = t.sending;
     message.hidden = true;
 
     post(config.urls.send, {
-      form: state.draft.form,
+      form: chosen.id,
       title: state.draft.title,
-      fields: state.draft.fields,
-      labels: state.draft.labels || [],
-      duplicateOf: state.draft.duplicateOf || 0,
-      reportId: state.error ? state.error.id : null,
+      fields: fields,
+      reportId: state.error && state.includeError ? state.error.id : null,
       page: page()
     })
       .then(function (data) {
-        if (mine !== requestId) {
+        if (current !== requestId) {
           return;
         }
 
-        var wasDuplicate = (state.draft.duplicateOf || 0) > 0;
-
-        state.text = '';
         state.draft = null;
+        state.loaded = false;
         state.error = null;
         config.recentError = null;
-        launcher.classList.remove('igi-has-error');
-        launcher.querySelector('.igi-launcher-label').textContent = t.button;
-        done(data, wasDuplicate);
+        alertLauncher(false);
+        done(data);
       })
       .catch(function (error) {
-        if (mine !== requestId) {
+        if (current !== requestId) {
           return;
         }
 
@@ -555,14 +646,14 @@
       });
   }
 
-  function done(data, wasDuplicate) {
+  function done(data) {
     state.step = 'done';
     body.textContent = '';
 
-    var again = el('button', { type: 'button', class: 'igi-secondary', text: t.another, onclick: function () { show('compose'); } });
+    var again = el('button', { type: 'button', class: 'igi-secondary', text: t.another, onclick: function () { show('form'); } });
 
     body.appendChild(el('div', { class: 'igi-done', role: 'status' }, [
-      el('p', { class: 'igi-thanks', text: fill(wasDuplicate ? t.added : t.sent, { number: data.number }) }),
+      el('p', { class: 'igi-thanks', text: fill(t.sent, { number: data.number }) }),
       el('div', { class: 'igi-actions' }, [
         again,
         data.url ? el('a', { class: 'igi-primary', href: data.url, target: '_blank', rel: 'noopener', text: t.view }) : null
@@ -572,7 +663,7 @@
     again.focus();
   }
 
-  // What I reported before
+  // ------------------------------------------------- what I reported before
 
   function mine() {
     var current = ++requestId;
@@ -614,5 +705,5 @@
 
   // For a page that wants to open the window itself, e.g. "Make an issue"
   // on a recorded error: IGotIssues.open({ id: 12, title: '...' }).
-  window.IGotIssues = { open: open, close: close };
+  window.IGotIssues = { open: openWindow, close: close };
 })();

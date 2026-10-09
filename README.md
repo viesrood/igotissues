@@ -2,10 +2,11 @@
 
 A Craft CMS 5 plugin that turns what people run into on a site into GitHub issues.
 
-- **A report button** in the control panel and on the front end. Someone describes a
-  problem or a wish in their own words.
-- **Claude drafts the issue** in the shape of your repository's own issue forms and
-  points out an open issue that looks the same. A person checks it and sends it.
+- **A report button** in the control panel and on the front end. Someone fills in your
+  repository's own issue form, without leaving the site.
+- **A technical report goes along**, the way a problem report does on a Mac: what the
+  server knows, the server error the reporter just ran into, and what the browser saw
+  before the report. The reporter can read it before sending.
 - **Errors are recorded** once per distinct error, with a count. They wait in the control
   panel until someone makes an issue of them.
 - **No webhook.** The plugin fetches issue states itself, so it also works on a site
@@ -18,6 +19,7 @@ A Craft CMS 5 plugin that turns what people run into on a site into GitHub issue
 - [Credentials](#credentials)
 - [Configuration](#configuration)
 - [The report button](#the-report-button)
+- [The technical report](#the-technical-report)
 - [Errors](#errors)
 - [Keeping issue states up to date](#keeping-issue-states-up-to-date)
 - [Events](#events)
@@ -42,7 +44,6 @@ Put these in `.env`:
 ```
 IGOTISSUES_GITHUB_TOKEN=
 IGOTISSUES_GITHUB_REPO=owner/name
-IGOTISSUES_ANTHROPIC_KEY=
 ```
 
 **GitHub token.** Create a [fine-grained personal access token](https://github.com/settings/personal-access-tokens)
@@ -56,9 +57,6 @@ with access to only the one repository, and these repository permissions:
 
 Contents is only used to read `.github/ISSUE_TEMPLATE/*.yml`.
 
-**Anthropic API key.** Optional. Without it, reporting works the same with an empty form
-instead of a draft.
-
 After saving, use **Test the saved connection** under Settings → Plugins → I got issues.
 It tells you when the token is refused and which labels from your issue forms do not
 exist in the repository.
@@ -70,10 +68,8 @@ Every setting is in the control panel and can be overridden per environment in
 
 | Setting | Default | |
 |---|---|---|
-| `githubToken`, `githubRepo`, `anthropicApiKey` | env references | See above. |
+| `githubToken`, `githubRepo` | env references | See above. |
 | `githubApiUrl` | `https://api.github.com/` | For GitHub Enterprise Server: `https://<host>/api/v3/`. |
-| `model` | `claude-opus-5-5` | The Claude model that writes the draft. |
-| `draftInstructions` | `''` | How issues are written on this project, e.g. "Write in Dutch." |
 | `reportPermission` | `accessCp` | The permission a user needs to report. Admins always may. |
 | `position` | `bottom-right` | Or `bottom-left`. |
 | `autoInject` | `false` | Add the button to front-end pages through `endBody()`. |
@@ -110,6 +106,24 @@ repository without forms gets a built-in bug form and feature form.
 
 Labels are never created. A label that does not exist in the repository is left off.
 
+## The technical report
+
+Every report carries a technical report, folded away under what the reporter wrote. It
+is put together for them; they only describe what they saw.
+
+| Part | What is in it |
+|---|---|
+| The page | URL, title, site, viewport, browser, language |
+| The installation | Environment, release, Craft, PHP, database, every plugin with its version |
+| The server error | When the reporter ran into an error in the last ten minutes: its class, message, where it was thrown and the stack trace |
+| The browser | The last thirty things that happened before the report: script errors, failed requests, `console.error` messages, and which links and buttons were clicked |
+
+The window has a **What is sent along** section that shows exactly this, before anything
+is sent. The server error can be left out with a checkbox.
+
+What is never collected: anything typed into a field, request bodies, query strings of
+requests, cookies, and the arguments in a stack trace.
+
 ## Errors
 
 With `captureErrors` on, every unexpected error (an uncaught exception, or an HTTP error
@@ -118,7 +132,7 @@ are thrown from the same place through the same code of your own; the message is
 compared, because it usually carries an id. The same error raises a counter.
 
 Nothing goes to GitHub by itself. Open the error, choose **Make an issue**, and you get
-the same window with a draft about that error. Choose **Ignore** for one that needs no
+the same window with that error attached. Choose **Ignore** for one that needs no
 issue.
 
 A user who ran into an error in the last ten minutes sees the button turn red and ask
@@ -158,16 +172,14 @@ Event::on(Capture::class, Capture::EVENT_BEFORE_CAPTURE, function (CaptureEvent 
 
 ## Security
 
-- **What leaves the site.** A report goes to GitHub and, for a draft, to the Claude API.
-  Before that, the plugin removes the values of environment variables whose name says
-  they hold a secret, bearer tokens, credentials in URLs, token-like query parameters and
-  the installation path. Stack traces carry no arguments. Request bodies are never sent.
-  This is a safety net, not a guarantee: a reporter can still type a password into the
-  form, and an error message can carry data the scrubber does not know is private. Use a
-  private repository if that matters to you.
-- **Prompt injection.** The reporter's text and error messages are given to Claude as
-  data, and its reply is validated against the repository's real forms, labels and open
-  issues. A person confirms every issue.
+- **What leaves the site.** A report goes to GitHub, and nowhere else. Before that, the
+  plugin removes the values of environment variables whose name says they hold a secret,
+  bearer tokens, credentials in URLs, token-like query parameters and the installation
+  path. This is a safety net, not a guarantee: a reporter can still type a password into
+  the form, and an error message can carry data the scrubber does not know is private.
+  Use a private repository if that matters to you.
+- **The browser log is untrusted.** It is typed by a browser, so the server only accepts
+  known kinds of lines, bounds their length and scrubs them like any other text.
 - **Who can report.** Only logged-in users with the configured permission. Every endpoint
   requires a POST with a CSRF token and is rate-limited per user.
 - Credentials are only used server-side.

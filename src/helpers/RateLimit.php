@@ -7,8 +7,8 @@ namespace viesrood\igotissues\helpers;
 use Craft;
 
 /**
- * A ceiling on how often one user may ask for something that costs money or
- * creates something elsewhere: a draft from Claude, an issue on GitHub.
+ * A ceiling on how often one user may create something elsewhere: an issue
+ * on GitHub.
  */
 final class RateLimit
 {

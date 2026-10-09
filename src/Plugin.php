@@ -17,7 +17,6 @@ use craft\web\UrlManager;
 use craft\web\View;
 use viesrood\igotissues\models\Settings;
 use viesrood\igotissues\services\Capture;
-use viesrood\igotissues\services\Drafter;
 use viesrood\igotissues\services\GitHub;
 use viesrood\igotissues\services\Reports;
 use viesrood\igotissues\web\twig\IGotIssuesExtension;
@@ -30,13 +29,13 @@ use yii\base\Event;
  * Turns what people run into on a site into GitHub issues:
  * - a report button in the control panel and on the front end, where someone
  *   describes a problem or a wish in their own words;
- * - Claude drafts the issue in the shape of the repository's own issue forms
- *   and points out an open issue that looks the same; a person confirms;
+ * - the report takes the shape of the repository's own issue forms, and a
+ *   technical report goes along with it: what the server knows and what the
+ *   browser saw just before, visible to the reporter before it is sent;
  * - unexpected errors are recorded once per distinct error, with a count, and
  *   wait in the control panel until someone makes an issue of them.
  *
  * @property-read Capture $capture
- * @property-read Drafter $drafter
  * @property-read GitHub $github
  * @property-read Reports $reports
  */
@@ -59,7 +58,6 @@ class Plugin extends BasePlugin
         return [
             'components' => [
                 'capture' => Capture::class,
-                'drafter' => Drafter::class,
                 'github' => GitHub::class,
                 'reports' => Reports::class,
             ],
@@ -85,14 +83,6 @@ class Plugin extends BasePlugin
     {
         /** @var Capture $service */
         $service = $this->get('capture');
-
-        return $service;
-    }
-
-    public function getDrafter(): Drafter
-    {
-        /** @var Drafter $service */
-        $service = $this->get('drafter');
 
         return $service;
     }

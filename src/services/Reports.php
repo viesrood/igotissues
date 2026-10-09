@@ -15,7 +15,6 @@ use InvalidArgumentException;
 use Throwable;
 use viesrood\igotissues\events\DefineContextEvent;
 use viesrood\igotissues\github\GitHubException;
-use viesrood\igotissues\helpers\Drafting;
 use viesrood\igotissues\helpers\IssueBody;
 use viesrood\igotissues\helpers\IssueForms;
 use viesrood\igotissues\helpers\Scrubber;
@@ -26,7 +25,6 @@ use viesrood\igotissues\records\ReportRecord;
  * Reports: who may send one, what goes with it, and getting it to GitHub.
  *
  * @phpstan-import-type Form from IssueForms
- * @phpstan-import-type Draft from Drafting
  */
 class Reports extends Component
 {
@@ -40,6 +38,9 @@ class Reports extends Component
 
     private const SYNC_KEY = 'igotissues:last-sync';
     private const SYNC_EVERY = 300;
+
+    private const BROWSER_EVENTS = 30;
+    private const BROWSER_EVENT_TYPES = ['error', 'console', 'request', 'click', 'page'];
 
     /** @var string[]|null */
     private ?array $secrets = null;
@@ -103,25 +104,16 @@ class Reports extends Component
         $context['Craft'] = $app->getVersion();
         $context['I got issues'] = (string)$plugin?->getVersion();
         $context['PHP'] = PHP_VERSION;
+        $context['Database'] = $this->database();
+        $context['Plugins'] = $this->plugins();
+        $context['Dev mode'] = $app->getConfig()->getGeneral()->devMode ? 'on' : '';
+        $context['Language'] = $string($page['language'] ?? '', 20);
+        $context['Reported at'] = gmdate('Y-m-d H:i:s') . ' UTC';
         $context['Browser'] = $string($app->getRequest()->getUserAgent(), 300);
         $context['Viewport'] = $string($page['viewport'] ?? '', 30);
 
         if ($user !== null && ($settings === null || $settings->includeReporter)) {
             $context['Reported by'] = $user->getName();
-        }
-
-        $errors = [];
-
-        foreach (array_slice(is_array($page['jsErrors'] ?? null) ? $page['jsErrors'] : [], -5) as $error) {
-            $error = $string($error, 300);
-
-            if ($error !== '') {
-                $errors[] = $this->scrub($error);
-            }
-        }
-
-        if ($errors !== []) {
-            $context['JavaScript errors'] = implode("\n", $errors);
         }
 
         if ($this->hasEventHandlers(self::EVENT_DEFINE_CONTEXT)) {
@@ -138,7 +130,47 @@ class Reports extends Component
     }
 
     /**
-     * The error a draft or an issue is about, as text.
+     * What the browser saw before the report: script errors, failed requests,
+     * console errors and the last clicks, one per line, oldest first.
+     *
+     * Everything here was typed by a browser, so it is untrusted: only known
+     * kinds, bounded lengths, scrubbed like any other text.
+     *
+     * @param array<array-key, mixed> $page
+     */
+    public function browserLog(array $page): string
+    {
+        $lines = [];
+
+        foreach (array_slice(is_array($page['events'] ?? null) ? $page['events'] : [], -self::BROWSER_EVENTS) as $event) {
+            if (!is_array($event) || !in_array($event['type'] ?? null, self::BROWSER_EVENT_TYPES, true)) {
+                continue;
+            }
+
+            $text = is_scalar($event['text'] ?? null) ? trim((string)preg_replace('/\s+/', ' ', (string)$event['text'])) : '';
+            $time = is_string($event['time'] ?? null) && preg_match('/^\d{2}:\d{2}:\d{2}$/', $event['time']) === 1 ? $event['time'] : '--:--:--';
+
+            if ($text !== '') {
+                $lines[] = sprintf('%s  %-7s  %s', $time, $event['type'], $this->scrub(Scrubber::limit($text, 300)));
+            }
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * What will go along with a report from this page, as the reporter may
+     * read it before sending.
+     *
+     * @param array<array-key, mixed> $page
+     */
+    public function preview(array $page, User $user, ?ReportRecord $error): string
+    {
+        return IssueBody::plainReport($this->context($page, $user), $this->browserLog($page), $this->errorText($error));
+    }
+
+    /**
+     * The error an issue is about, as text.
      */
     public function errorText(?ReportRecord $error): string
     {
@@ -214,10 +246,9 @@ class Reports extends Component
     }
 
     /**
-     * Send a confirmed report to GitHub: a new issue, or a comment on the
-     * issue the reporter said it duplicates.
+     * Send a report to GitHub as a new issue, with its technical report.
      *
-     * @param array<array-key, mixed> $input form, title, fields, labels, duplicateOf, reportId
+     * @param array<array-key, mixed> $input form, title, fields, reportId
      * @param array<array-key, mixed> $page
      * @throws InvalidArgumentException When the report is incomplete; the message is for the reporter.
      * @throws GitHubException When GitHub did not take it.
@@ -275,40 +306,22 @@ class Reports extends Component
             $context += $this->prefixed('Error', $error->contextLines());
         }
 
-        $marker = IssueBody::marker($record->uid, $record->fingerprint);
-        $errorText = $this->errorText($error);
+        // GitHub rejects the whole issue over one label it does not know.
+        $labels = array_values(array_intersect($form['labels'], $github->labels()));
         $fullTitle = IssueBody::title($form, $title);
-        $duplicateOf = is_numeric($input['duplicateOf'] ?? null) ? (int)$input['duplicateOf'] : 0;
+        $report = IssueBody::technicalReport($context, $this->browserLog($page), $this->errorText($error));
 
-        if ($duplicateOf > 0) {
-            $issue = $github->api()->issue($duplicateOf);
-
-            if ($issue === null) {
-                throw new InvalidArgumentException(Craft::t('igotissues', 'That issue no longer exists.'));
-            }
-
-            $github->api()->comment($duplicateOf, IssueBody::comment($form, $values, $context, $marker, $errorText));
-        } else {
-            $known = $github->labels();
-            $labels = $form['labels'];
-
-            foreach (is_array($input['labels'] ?? null) ? $input['labels'] : [] as $label) {
-                if (is_string($label) && !in_array($label, $labels, true)) {
-                    $labels[] = $label;
-                }
-            }
-
-            // GitHub rejects the whole issue over one label it does not know.
-            $labels = array_values(array_intersect($labels, $known));
-
-            $issue = $github->createIssue($fullTitle, IssueBody::render($form, $values, $context, $marker, $errorText), $labels);
-        }
+        $issue = $github->createIssue(
+            $fullTitle,
+            IssueBody::render($form, $values, $report, IssueBody::marker($record->uid, $record->fingerprint)),
+            $labels,
+        );
 
         $now = Db::prepareDateForDb(new DateTime());
 
         if ($error === null) {
             $record->title = Scrubber::limit($fullTitle, 255);
-            $record->body = IssueBody::render($form, $values, [], '');
+            $record->body = IssueBody::render($form, $values, '', '');
             $record->context = (string)json_encode($context, JSON_INVALID_UTF8_SUBSTITUTE);
             $record->userId = $user->id;
             $record->firstSeen = $now;
@@ -491,6 +504,39 @@ class Reports extends Component
         }
 
         return preg_match('/^[a-f0-9]{7,64}$/', $head) === 1 ? substr($head, 0, 7) : '';
+    }
+
+    private function database(): string
+    {
+        try {
+            $db = Craft::$app->getDb();
+
+            return $db->getDriverName() . ' ' . $db->getServerVersion();
+        } catch (Throwable) {
+            return '';
+        }
+    }
+
+    /**
+     * Every enabled plugin with its version: the first thing a developer asks.
+     */
+    private function plugins(): string
+    {
+        try {
+            /** @var \craft\web\Application|\craft\console\Application $app */
+            $app = Craft::$app;
+            $plugins = [];
+
+            foreach ($app->getPlugins()->getAllPlugins() as $plugin) {
+                $plugins[] = $plugin->id . ' ' . $plugin->getVersion();
+            }
+
+            sort($plugins);
+
+            return implode(', ', $plugins);
+        } catch (Throwable) {
+            return '';
+        }
     }
 
     /**
