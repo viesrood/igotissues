@@ -1,0 +1,202 @@
+{% import '_includes/forms.twig' as forms %}
+
+<p>
+    {{ 'Every setting below can also be set per environment in config/igotissues.php. Credentials are only ever used server-side and never reach the browser.'|t('igotissues') }}
+</p>
+
+<h2>{{ 'GitHub'|t('igotissues') }}</h2>
+
+{{ forms.autosuggestField({
+    label: 'GitHub token'|t('igotissues'),
+    instructions: 'A fine-grained personal access token for this one repository, with Issues (read and write), Contents (read) and Metadata. Use an environment variable; a value typed here is stored in project config.'|t('igotissues'),
+    id: 'githubToken',
+    name: 'githubToken',
+    value: settings.githubToken,
+    suggestEnvVars: true,
+    errors: settings.getErrors('githubToken'),
+}) }}
+
+{{ forms.autosuggestField({
+    label: 'Repository'|t('igotissues'),
+    instructions: 'Where issues go, as owner/name. Its issue forms (.github/ISSUE_TEMPLATE) decide what a report looks like.'|t('igotissues'),
+    id: 'githubRepo',
+    name: 'githubRepo',
+    value: settings.githubRepo,
+    suggestEnvVars: true,
+    errors: settings.getErrors('githubRepo'),
+}) }}
+
+{{ forms.autosuggestField({
+    label: 'GitHub API address'|t('igotissues'),
+    instructions: 'Leave as it is for github.com. For GitHub Enterprise Server this is https://your-host/api/v3/.'|t('igotissues'),
+    id: 'githubApiUrl',
+    name: 'githubApiUrl',
+    value: settings.githubApiUrl,
+    suggestEnvVars: true,
+    errors: settings.getErrors('githubApiUrl'),
+}) }}
+
+<div class="field">
+    <button type="button" class="btn" id="igotissues-test">{{ 'Test the saved connection'|t('igotissues') }}</button>
+    <p id="igotissues-test-result" class="light" role="status"></p>
+</div>
+
+{{ forms.lightswitchField({
+    label: 'Reopen an issue when its error comes back'|t('igotissues'),
+    instructions: 'When a recorded error happens again after its issue was closed, a comment is added and the issue is reopened at the next sync.'|t('igotissues'),
+    id: 'reopenOnRecurrence',
+    name: 'reopenOnRecurrence',
+    on: settings.reopenOnRecurrence,
+}) }}
+
+{{ forms.textField({
+    label: 'Timeout'|t('igotissues'),
+    instructions: 'Seconds to wait for GitHub.'|t('igotissues'),
+    id: 'timeout',
+    name: 'timeout',
+    type: 'number',
+    min: 1,
+    max: 60,
+    value: settings.timeout,
+    errors: settings.getErrors('timeout'),
+}) }}
+
+<h2>{{ 'Drafts by Claude'|t('igotissues') }}</h2>
+
+{{ forms.autosuggestField({
+    label: 'Anthropic API key'|t('igotissues'),
+    instructions: 'With a key, Claude writes a first version of each report for the reporter to check. Without one, reporting works the same with an empty form.'|t('igotissues'),
+    id: 'anthropicApiKey',
+    name: 'anthropicApiKey',
+    value: settings.anthropicApiKey,
+    suggestEnvVars: true,
+    errors: settings.getErrors('anthropicApiKey'),
+}) }}
+
+{{ forms.textField({
+    label: 'Model'|t('igotissues'),
+    instructions: 'The Claude model id that writes the draft.'|t('igotissues'),
+    id: 'model',
+    name: 'model',
+    value: settings.model,
+    errors: settings.getErrors('model'),
+}) }}
+
+{{ forms.textareaField({
+    label: 'Instructions for the draft'|t('igotissues'),
+    instructions: 'How issues are written on this project, for example the language to write in.'|t('igotissues'),
+    id: 'draftInstructions',
+    name: 'draftInstructions',
+    rows: 4,
+    value: settings.draftInstructions,
+    errors: settings.getErrors('draftInstructions'),
+}) }}
+
+<h2>{{ 'Reporting'|t('igotissues') }}</h2>
+
+{{ forms.textField({
+    label: 'Permission to report'|t('igotissues'),
+    instructions: 'The Craft permission a user needs to see the report button. Admins always see it.'|t('igotissues'),
+    id: 'reportPermission',
+    name: 'reportPermission',
+    value: settings.reportPermission,
+    errors: settings.getErrors('reportPermission'),
+}) }}
+
+{{ forms.selectField({
+    label: 'Position of the button'|t('igotissues'),
+    id: 'position',
+    name: 'position',
+    options: [
+        { label: 'Bottom right'|t('igotissues'), value: 'bottom-right' },
+        { label: 'Bottom left'|t('igotissues'), value: 'bottom-left' },
+    ],
+    value: settings.position,
+    errors: settings.getErrors('position'),
+}) }}
+
+{{ forms.lightswitchField({
+    label: 'Add the button to front-end pages automatically'|t('igotissues'),
+    instructions: 'Works in templates that call endBody(). In other templates, output igotissues_widget() where the button should load.'|t('igotissues'),
+    id: 'autoInject',
+    name: 'autoInject',
+    on: settings.autoInject,
+}) }}
+
+{{ forms.lightswitchField({
+    label: 'Put the name of the reporter in the issue'|t('igotissues'),
+    id: 'includeReporter',
+    name: 'includeReporter',
+    on: settings.includeReporter,
+}) }}
+
+{{ forms.textField({
+    label: 'Release file'|t('igotissues'),
+    instructions: 'A file, relative to the project root, whose first line names the deployed release. Leave empty to use the git commit when there is one.'|t('igotissues'),
+    id: 'releaseFile',
+    name: 'releaseFile',
+    value: settings.releaseFile,
+    errors: settings.getErrors('releaseFile'),
+}) }}
+
+<h2>{{ 'Errors'|t('igotissues') }}</h2>
+
+{{ forms.lightswitchField({
+    label: 'Record unexpected errors'|t('igotissues'),
+    instructions: 'Each distinct error is listed once under Reports, with a count. Nothing is sent to GitHub until someone makes an issue of it.'|t('igotissues'),
+    id: 'captureErrors',
+    name: 'captureErrors',
+    on: settings.captureErrors,
+}) }}
+
+{{ forms.lightswitchField({
+    label: 'Also while devMode is on'|t('igotissues'),
+    id: 'captureInDevMode',
+    name: 'captureInDevMode',
+    on: settings.captureInDevMode,
+}) }}
+
+{{ forms.lightswitchField({
+    label: 'Also from console commands'|t('igotissues'),
+    id: 'captureConsole',
+    name: 'captureConsole',
+    on: settings.captureConsole,
+}) }}
+
+{% js %}
+(function() {
+    var button = document.getElementById('igotissues-test');
+    var result = document.getElementById('igotissues-test-result');
+
+    if (!button || !result) {
+        return;
+    }
+
+    button.addEventListener('click', function() {
+        button.classList.add('loading');
+        result.textContent = '';
+
+        Craft.sendActionRequest('POST', 'igotissues/cp/test')
+            .then(function(response) {
+                var data = response.data || {};
+                var lines = [data.success ? data.message : data.error];
+
+                if (data.success && data.missingLabels && data.missingLabels.length) {
+                    lines.push({{ 'These labels from the forms do not exist in the repository and will be left off:'|t('igotissues')|json_encode|raw }} + ' ' + data.missingLabels.join(', '));
+                }
+
+                if (data.success && !data.drafts) {
+                    lines.push({{ 'No Anthropic API key is set, so reports start from an empty form.'|t('igotissues')|json_encode|raw }});
+                }
+
+                result.textContent = lines.join(' ');
+            })
+            .catch(function() {
+                result.textContent = {{ 'The request failed. Check the Craft logs for details.'|t('igotissues')|json_encode|raw }};
+            })
+            .finally(function() {
+                button.classList.remove('loading');
+            });
+    });
+})();
+{% endjs %}

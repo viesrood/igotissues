@@ -1,0 +1,67 @@
+{
+    "name": "viesrood/igotissues",
+    "description": "Report bugs and wishes from the Craft CMS control panel and front end as GitHub issues, drafted by Claude and confirmed by a human, with automatic de-duplicated error capture.",
+    "type": "craft-plugin",
+    "license": "MIT",
+    "keywords": [
+        "craft",
+        "craftcms",
+        "craft-plugin",
+        "github",
+        "issues",
+        "feedback",
+        "bug-report",
+        "error-tracking",
+        "claude"
+    ],
+    "support": {
+        "docs": "https://github.com/viesrood/igotissues/blob/main/README.md",
+        "issues": "https://github.com/viesrood/igotissues/issues",
+        "source": "https://github.com/viesrood/igotissues"
+    },
+    "require": {
+        "craftcms/cms": "^5.0.0",
+        "php": ">=8.2"
+    },
+    "require-dev": {
+        "phpstan/phpstan": "^2.0",
+        "phpunit/phpunit": "^11.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "viesrood\\igotissues\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "viesrood\\igotissues\\tests\\": "tests/"
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "platform": {
+            "php": "8.2.0"
+        },
+        "allow-plugins": {
+            "yiisoft/yii2-composer": true,
+            "craftcms/plugin-installer": true
+        }
+    },
+    "scripts": {
+        "check": [
+            "@test",
+            "@analyse"
+        ],
+        "test": "phpunit",
+        "analyse": "phpstan analyse --no-progress --memory-limit=512M"
+    },
+    "extra": {
+        "handle": "igotissues",
+        "name": "I got issues",
+        "class": "viesrood\\igotissues\\Plugin",
+        "developer": "Viesrood",
+        "developerUrl": "https://viesrood.nl",
+        "documentationUrl": "https://github.com/viesrood/igotissues",
+        "changelogUrl": "https://raw.githubusercontent.com/viesrood/igotissues/main/CHANGELOG.md"
+    }
+}

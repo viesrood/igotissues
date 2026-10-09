@@ -1,0 +1,70 @@
+{% extends '_layouts/cp' %}
+
+{% set title = 'Reports'|t('igotissues') %}
+{% set selectedSubnavItem = 'reports' %}
+
+{% set filterLabels = {
+    all: 'All'|t('igotissues'),
+    waiting: 'Waiting'|t('igotissues'),
+    sent: 'On GitHub'|t('igotissues'),
+    ignored: 'Ignored'|t('igotissues'),
+} %}
+
+{% block actionButton %}
+    <form method="post" accept-charset="UTF-8">
+        {{ csrfInput() }}
+        {{ actionInput('igotissues/cp/sync') }}
+        {{ redirectInput('igotissues') }}
+        <button type="submit" class="btn">{{ 'Sync with GitHub'|t('igotissues') }}</button>
+    </form>
+{% endblock %}
+
+{% block content %}
+    {% if not configured %}
+        <p class="error">{{ 'No GitHub token or repository is configured, so nobody can report yet. An admin sets them under Settings, Plugins.'|t('igotissues') }}</p>
+    {% endif %}
+
+    <nav class="btngroup" aria-label="{{ 'Filter'|t('igotissues') }}">
+        {% for key in filters %}
+            <a class="btn{{ key == filter ? ' active' }}" href="{{ cpUrl('igotissues', key == 'all' ? {} : { show: key }) }}"{{ key == filter ? ' aria-current="true"' }}>{{ filterLabels[key] }}</a>
+        {% endfor %}
+    </nav>
+
+    {% if records|length %}
+        <table class="data fullwidth" style="margin-top: 24px;">
+            <thead>
+                <tr>
+                    <th scope="col">{{ 'Report'|t('igotissues') }}</th>
+                    <th scope="col">{{ 'Kind'|t('igotissues') }}</th>
+                    <th scope="col">{{ 'Seen'|t('igotissues') }}</th>
+                    <th scope="col">{{ 'Last seen'|t('igotissues') }}</th>
+                    <th scope="col">{{ 'By'|t('igotissues') }}</th>
+                    <th scope="col">{{ 'Issue'|t('igotissues') }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in records %}
+                    <tr>
+                        <th scope="row"><a href="{{ cpUrl('igotissues/' ~ record.id) }}">{{ record.title }}</a></th>
+                        <td>{{ record.source == 'error' ? 'Error'|t('igotissues') : 'Report'|t('igotissues') }}</td>
+                        <td>{{ record.occurrences }}</td>
+                        <td>{{ (record.lastSeen ~ ' UTC')|datetime('short') }}</td>
+                        <td>{{ record.userId ? (reporters[record.userId] ?? '') }}</td>
+                        <td>
+                            {% if record.issueNumber %}
+                                <a href="{{ record.issueUrl }}" rel="noopener" target="_blank">#{{ record.issueNumber }}</a>
+                                <span class="light">{{ record.issueState == 'closed' ? 'closed'|t('igotissues') : 'open'|t('igotissues') }}</span>
+                            {% elseif record.status == 'ignored' %}
+                                <span class="light">{{ 'ignored'|t('igotissues') }}</span>
+                            {% else %}
+                                <span class="light">{{ 'waiting'|t('igotissues') }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="zilch" style="margin-top: 24px;">{{ 'Nothing here.'|t('igotissues') }}</p>
+    {% endif %}
+{% endblock %}

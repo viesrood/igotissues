@@ -1,0 +1,88 @@
+{% extends '_layouts/cp' %}
+
+{% set title = record.title %}
+{% set crumbs = [{ label: 'Reports'|t('igotissues'), url: cpUrl('igotissues') }] %}
+
+{% block actionButton %}
+    {% if not record.issueNumber %}
+        {% if currentUser.admin %}
+            <form method="post" accept-charset="UTF-8">
+                {{ csrfInput() }}
+                {{ actionInput('igotissues/cp/ignore') }}
+                {{ redirectInput('igotissues') }}
+                {{ hiddenInput('id', record.id) }}
+                {{ hiddenInput('ignored', record.status == 'ignored' ? '0' : '1') }}
+                <button type="submit" class="btn">{{ record.status == 'ignored' ? 'Stop ignoring'|t('igotissues') : 'Ignore'|t('igotissues') }}</button>
+            </form>
+        {% endif %}
+        {% if configured and record.source == 'error' %}
+            <button type="button" class="btn submit" id="igotissues-make-issue" data-id="{{ record.id }}" data-title="{{ record.title }}">{{ 'Make an issue'|t('igotissues') }}</button>
+        {% endif %}
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    <p>
+        {% if record.issueNumber %}
+            <a href="{{ record.issueUrl }}" rel="noopener" target="_blank">#{{ record.issueNumber }}</a>
+            <span class="light">{{ record.issueState == 'closed' ? 'closed'|t('igotissues') : 'open'|t('igotissues') }}</span>
+        {% elseif record.status == 'ignored' %}
+            <span class="light">{{ 'ignored'|t('igotissues') }}</span>
+        {% else %}
+            <span class="light">{{ 'waiting'|t('igotissues') }}</span>
+        {% endif %}
+    </p>
+
+    <table class="data" style="margin: 16px 0 24px;">
+        <tbody>
+            <tr>
+                <th scope="row">{{ 'Seen'|t('igotissues') }}</th>
+                <td>{{ record.occurrences }}</td>
+            </tr>
+            <tr>
+                <th scope="row">{{ 'First seen'|t('igotissues') }}</th>
+                <td>{{ (record.firstSeen ~ ' UTC')|datetime('short') }}</td>
+            </tr>
+            <tr>
+                <th scope="row">{{ 'Last seen'|t('igotissues') }}</th>
+                <td>{{ (record.lastSeen ~ ' UTC')|datetime('short') }}</td>
+            </tr>
+            {% if record.userId and reporters[record.userId] ?? false %}
+                <tr>
+                    <th scope="row">{{ 'By'|t('igotissues') }}</th>
+                    <td>{{ reporters[record.userId] }}</td>
+                </tr>
+            {% endif %}
+            {% for label, value in context %}
+                <tr>
+                    <th scope="row">{{ label }}</th>
+                    <td style="white-space: pre-wrap; overflow-wrap: anywhere;">{{ value }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if record.body %}
+        <pre style="white-space: pre-wrap; overflow-wrap: anywhere;"><code>{{ record.body }}</code></pre>
+    {% endif %}
+{% endblock %}
+
+{% js %}
+(function() {
+    var button = document.getElementById('igotissues-make-issue');
+
+    if (!button) {
+        return;
+    }
+
+    button.addEventListener('click', function() {
+        if (window.IGotIssues) {
+            window.IGotIssues.open({
+                id: parseInt(button.getAttribute('data-id'), 10),
+                title: button.getAttribute('data-title'),
+                returnFocus: button
+            });
+        }
+    });
+})();
+{% endjs %}
