@@ -1,5 +1,11 @@
 # Release Notes for I got issues
 
+## 2.0.1 - 2026-10-09
+
+### Changed
+
+- A new plugin icon.
+
 ## 2.0.0 - 2026-10-09
 
 ### Removed
