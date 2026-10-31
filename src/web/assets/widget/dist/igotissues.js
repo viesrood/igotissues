@@ -280,6 +280,104 @@
   root.appendChild(backdrop);
   root.appendChild(dialog);
 
+  // ------------------------------------------------ keeping clear of notices
+
+  // The button floats over the page, so it can cover whatever else sits at the bottom edge:
+  // the control panel's notifications (Craft shows them bottom-left by default, and across
+  // the full width on a narrow screen), or a bar a site fixes to the bottom of the screen.
+  // When one of those overlaps the button, the button moves up until it sits just above it,
+  // and drops back when it is gone. Nothing is hidden or covered. A site marks its own
+  // elements with `data-igotissues-clear`; the control panel's notifications are known.
+  var CLEAR = '#notifications > .notification, [data-igotissues-clear]';
+  var CLEAR_GAP = 12;
+  var clearQueued = false;
+
+  function overlaps(a, b) {
+    return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+  }
+
+  function obstacles() {
+    var found = [];
+
+    document.querySelectorAll(CLEAR).forEach(function (other) {
+      if (root.contains(other)) {
+        return;
+      }
+
+      var rect = other.getBoundingClientRect();
+      var style = window.getComputedStyle(other);
+
+      if (rect.width && rect.height && style.visibility !== 'hidden' && style.display !== 'none') {
+        found.push(rect);
+      }
+    });
+
+    return found;
+  }
+
+  function keepClear() {
+    clearQueued = false;
+
+    // Where the button sits when nothing is in the way, worked out rather than measured: the
+    // button moves with a transition, so its rectangle mid-move would say something else.
+    var now = launcher.getBoundingClientRect();
+    var gap = parseFloat(window.getComputedStyle(root).getPropertyValue('--igi-gap')) || 16;
+    var rest = { left: now.left, right: now.right, height: now.height, bottom: window.innerHeight - gap };
+    var others = obstacles();
+    var lift = 0;
+
+    // A stack of notifications grows upwards, so moving above one can land the button on
+    // the next. A few rounds settle it.
+    for (var round = 0; round < 8; round++) {
+      var bottom = rest.bottom - lift;
+      var own = { left: rest.left, right: rest.right, top: bottom - rest.height, bottom: bottom };
+      var hit = others.filter(function (rect) { return overlaps(rect, own); });
+
+      if (!hit.length) {
+        break;
+      }
+
+      var top = Math.min.apply(null, hit.map(function (rect) { return rect.top; }));
+      lift = window.innerHeight - top + CLEAR_GAP - gap;
+    }
+
+    var wanted = lift > 0 ? (gap + lift) + 'px' : '';
+
+    if (launcher.style.bottom !== wanted) {
+      launcher.style.bottom = wanted;
+    }
+
+    launcher.classList.toggle('igi-lifted', lift > 0);
+  }
+
+  function queueClear() {
+    if (!clearQueued) {
+      clearQueued = true;
+      window.requestAnimationFrame(keepClear);
+    }
+  }
+
+  if (window.MutationObserver) {
+    new MutationObserver(function (records) {
+      // Our own changes (the button moving) are not a reason to look again.
+      if (records.every(function (record) { return root.contains(record.target); })) {
+        return;
+      }
+
+      queueClear();
+      // A notice usually slides or fades in with a CSS transition, which is not a change
+      // in the document; look again once it has had time to land.
+      [150, 450, 900].forEach(function (delay) {
+        window.setTimeout(queueClear, delay);
+      });
+    }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class', 'hidden'] });
+  }
+
+  document.addEventListener('transitionend', queueClear, true);
+  document.addEventListener('animationend', queueClear, true);
+  window.addEventListener('resize', queueClear);
+  queueClear();
+
   dialog.addEventListener('keydown', function (event) {
     if (event.key === 'Escape') {
       event.stopPropagation();

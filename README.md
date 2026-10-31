@@ -100,6 +100,15 @@ on every page. If your layout calls `{% do view.endBody() %}`, you can turn on
 The widget brings its own stylesheet and script and depends on nothing else on the page.
 A page can open the window itself with `window.IGotIssues.open()`.
 
+**The button keeps clear of what sits at the bottom of the screen.** In the control panel it
+moves up above Craft's notifications while they show. On a front end, mark anything you fix
+to the bottom edge, such as a selection bar or a cookie notice, and the button does the same:
+
+```html
+<div class="fixed inset-x-0 bottom-0" data-igotissues-clear>…</div>
+```
+
+
 **Your issue forms decide what a report looks like.** The plugin reads
 `.github/ISSUE_TEMPLATE/*.yml` from the repository and uses their fields, title prefix and
 labels, so an issue made here reads like one filed through GitHub's own form. `textarea`,
