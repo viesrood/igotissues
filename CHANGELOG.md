@@ -1,6 +1,6 @@
 # Release Notes for I got issues
 
-## Unreleased
+## 2.2.0 - 2026-10-31
 
 ### Changed
 
