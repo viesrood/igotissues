@@ -1,5 +1,16 @@
 # Release Notes for I got issues
 
+## Unreleased
+
+### Changed
+
+- **The button keeps clear of notices.** When a control panel notification or an element a
+  site marks with `data-igotissues-clear` overlaps the button, the button moves up until it
+  sits just above it, and drops back when it is gone. Before, the button covered the
+  bottom of Craft's notifications (bottom-left by default, full width on a narrow screen)
+  and anything a site fixed to the bottom of the screen. Nothing is hidden, and Craft's
+  notifications are not touched.
+
 ## 2.1.0 - 2026-10-09
 
 ### Added
