@@ -10,6 +10,7 @@ use craft\helpers\Db;
 use craft\helpers\StringHelper;
 use DateTime;
 use Throwable;
+use Twig\Error\RuntimeError as TwigRuntimeError;
 use viesrood\igotissues\events\CaptureEvent;
 use viesrood\igotissues\helpers\Fingerprint;
 use viesrood\igotissues\helpers\Scrubber;
@@ -35,9 +36,17 @@ class Capture extends Component
     /**
      * Whether this exception is a fault worth recording, as opposed to the
      * site doing its job (a 404, a 403, a failed form validation).
+     *
+     * A template that ends with `{% exit 404 %}` arrives wrapped in a Twig
+     * runtime error. Craft's error handler looks at the exception inside, and
+     * so does this, or every such 404 would be recorded as a fault.
      */
     public static function isFault(Throwable $exception): bool
     {
+        if ($exception instanceof TwigRuntimeError && $exception->getPrevious() !== null) {
+            $exception = $exception->getPrevious();
+        }
+
         return !($exception instanceof HttpException) || $exception->statusCode >= 500;
     }
 

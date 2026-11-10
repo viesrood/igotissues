@@ -6,6 +6,7 @@ namespace viesrood\igotissues\tests;
 
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
+use Twig\Error\RuntimeError as TwigRuntimeError;
 use viesrood\igotissues\helpers\Fingerprint;
 use viesrood\igotissues\helpers\IssueBody;
 use viesrood\igotissues\helpers\IssueForms;
@@ -141,6 +142,18 @@ final class HelpersTest extends TestCase
         self::assertFalse(Capture::isFault(new ForbiddenHttpException()));
         self::assertTrue(Capture::isFault(new ServerErrorHttpException()));
         self::assertTrue(Capture::isFault(new RuntimeException()));
+    }
+
+    public function testAnHttpExceptionInsideATemplateIsJudgedByItself(): void
+    {
+        // What `{% exit 404 %}` throws once Twig has wrapped it.
+        $wrap = static fn(\Throwable $inner) => new TwigRuntimeError('', -1, null, $inner);
+
+        self::assertFalse(Capture::isFault($wrap(new NotFoundHttpException())));
+        self::assertFalse(Capture::isFault($wrap(new ForbiddenHttpException())));
+        self::assertTrue(Capture::isFault($wrap(new ServerErrorHttpException())));
+        self::assertTrue(Capture::isFault($wrap(new RuntimeException())));
+        self::assertTrue(Capture::isFault(new TwigRuntimeError('Variable "x" does not exist.')));
     }
 
     // Scrubber

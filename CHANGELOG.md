@@ -1,5 +1,14 @@
 # Release Notes for I got issues
 
+## Unreleased
+
+### Fixed
+
+- **A 404 from a template is no longer recorded as an error.** `{% exit 404 %}` throws its
+  `NotFoundHttpException` inside a Twig runtime error, and the recorder only looked at the
+  outer exception, so every such page became a report. It now looks inside, as Craft's own
+  error handler does. A Twig error that wraps a real fault is still recorded.
+
 ## 2.2.1 - 2026-11-10
 
 ### Changed
