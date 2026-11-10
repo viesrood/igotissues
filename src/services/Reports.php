@@ -66,7 +66,7 @@ class Reports extends Component
      */
     public function scrub(string $text): string
     {
-        $this->secrets ??= Scrubber::secretsFrom($_ENV + $_SERVER);
+        $this->secrets ??= Scrubber::secretsFrom($_ENV + $_SERVER, Craft::$app->getSecurity()->sensitiveKeywords);
 
         return Scrubber::text($text, $this->secrets, $this->basePath());
     }
