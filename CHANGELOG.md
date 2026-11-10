@@ -1,5 +1,15 @@
 # Release Notes for I got issues
 
+## Unreleased
+
+### Changed
+
+- **Craft's `sensitiveKeywords` count as secret names.** Besides `key`, `token`, `secret` and
+  the like, an env var whose name contains one of the words in the `security` component's
+  `sensitiveKeywords` is now removed from reports too. A site that names a secret in another
+  language (`..._SLEUTEL`) adds the word there once, and both Craft's logs and the reports
+  leave it out.
+
 ## 2.2.0 - 2026-10-31
 
 ### Changed

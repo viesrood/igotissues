@@ -145,6 +145,17 @@ final class HelpersTest extends TestCase
 
     // Scrubber
 
+    public function testExtraKeywordsMarkASecretName(): void
+    {
+        $env = [
+            'MERKBRON_BEELDWERKER_SLEUTEL' => 'zeer-geheime-waarde',
+            'APP_LOCALE' => 'nl-NL-default',
+        ];
+
+        self::assertSame([], Scrubber::secretsFrom($env));
+        self::assertSame(['zeer-geheime-waarde'], Scrubber::secretsFrom($env, ['sleutel', '']));
+    }
+
     public function testSecretsAreRemovedFromTextAndUrls(): void
     {
         $secrets = Scrubber::secretsFrom([

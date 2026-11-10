@@ -59,9 +59,12 @@ final class Scrubber
      * The values of every env var whose name says it holds a secret.
      *
      * @param array<array-key, mixed> $env
+     * @param string[] $keywords Extra words that mark a name as secret, such as Craft's
+     *        `security.sensitiveKeywords`, so a site that names its secrets in another
+     *        language is covered too.
      * @return string[]
      */
-    public static function secretsFrom(array $env): array
+    public static function secretsFrom(array $env, array $keywords = []): array
     {
         $secrets = [];
 
@@ -70,7 +73,7 @@ final class Scrubber
                 continue;
             }
 
-            if (preg_match(self::SECRET_ENV, $name) === 1 && mb_strlen($value) >= self::MIN_SECRET_LENGTH) {
+            if (self::isSecretName($name, $keywords) && mb_strlen($value) >= self::MIN_SECRET_LENGTH) {
                 $secrets[] = $value;
             }
         }
@@ -79,6 +82,24 @@ final class Scrubber
         usort($secrets, static fn(string $a, string $b): int => strlen($b) <=> strlen($a));
 
         return array_values(array_unique($secrets));
+    }
+
+    /**
+     * @param string[] $keywords
+     */
+    private static function isSecretName(string $name, array $keywords): bool
+    {
+        if (preg_match(self::SECRET_ENV, $name) === 1) {
+            return true;
+        }
+
+        foreach ($keywords as $keyword) {
+            if (is_string($keyword) && $keyword !== '' && stripos($name, $keyword) !== false) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
