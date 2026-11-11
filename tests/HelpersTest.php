@@ -156,6 +156,22 @@ final class HelpersTest extends TestCase
         self::assertTrue(Capture::isFault(new TwigRuntimeError('Variable "x" does not exist.')));
     }
 
+    public function testALaravelResponseOrHttpErrorIsJudgedByItsStatus(): void
+    {
+        // What `{% redirect %}` throws on Craft 6, inside a template and on its own.
+        $redirect = new \Illuminate\Http\Exceptions\HttpResponseException(new \Illuminate\Http\RedirectResponse('/elsewhere'));
+        self::assertFalse(Capture::isFault($redirect));
+        self::assertFalse(Capture::isFault(new TwigRuntimeError('', -1, null, $redirect)));
+
+        // A response that is itself a server error still counts.
+        self::assertTrue(Capture::isFault(new \Illuminate\Http\Exceptions\HttpResponseException(new \Illuminate\Http\Response('', 500))));
+
+        // `abort(404)` and `abort(503)`.
+        self::assertFalse(Capture::isFault(new \Symfony\Component\HttpKernel\Exception\NotFoundHttpException()));
+        self::assertFalse(Capture::isFault(new \Symfony\Component\HttpKernel\Exception\HttpException(403)));
+        self::assertTrue(Capture::isFault(new \Symfony\Component\HttpKernel\Exception\HttpException(503)));
+    }
+
     // Scrubber
 
     public function testExtraKeywordsMarkASecretName(): void

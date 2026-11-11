@@ -17,6 +17,8 @@ use viesrood\igotissues\helpers\Scrubber;
 use viesrood\igotissues\Plugin;
 use viesrood\igotissues\records\ReportRecord;
 use yii\db\Expression;
+use Illuminate\Http\Exceptions\HttpResponseException;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use yii\web\HttpException;
 
 /**
@@ -40,11 +42,24 @@ class Capture extends Component
      * A template that ends with `{% exit 404 %}` arrives wrapped in a Twig
      * runtime error. Craft's error handler looks at the exception inside, and
      * so does this, or every such 404 would be recorded as a fault.
+     *
+     * On Craft 6, `{% redirect %}` and `{% exit %}` throw Laravel's
+     * `HttpResponseException`, which carries a finished response and is no
+     * fault at all, and HTTP errors are Symfony `HttpExceptionInterface`s
+     * with a status code instead of Yii's `HttpException`.
      */
     public static function isFault(Throwable $exception): bool
     {
         if ($exception instanceof TwigRuntimeError && $exception->getPrevious() !== null) {
             $exception = $exception->getPrevious();
+        }
+
+        if ($exception instanceof HttpResponseException) {
+            return $exception->getResponse()->getStatusCode() >= 500;
+        }
+
+        if ($exception instanceof HttpExceptionInterface) {
+            return $exception->getStatusCode() >= 500;
         }
 
         return !($exception instanceof HttpException) || $exception->statusCode >= 500;

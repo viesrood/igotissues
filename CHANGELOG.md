@@ -1,5 +1,19 @@
 # Release Notes for I got issues
 
+## 3.0.0-beta.1 - 2026-11-11
+
+### Changed
+
+- **Requires Craft CMS 6.0.0-beta.1 or later and PHP 8.5.** The plugin runs as a legacy plugin
+  through `craftcms/yii2-adapter`, which it now requires. It is not yet rewritten for Craft 6's
+  Laravel base classes.
+
+### Fixed
+
+- **A redirect from a template is no longer recorded as an error on Craft 6.** `{% redirect %}`
+  and `{% exit %}` throw Laravel's `HttpResponseException` there, and HTTP errors are Symfony
+  exceptions with a status code. Both are now judged by their status, like Yii's `HttpException`.
+
 ## 2.2.2 - 2026-11-10
 
 ### Fixed
