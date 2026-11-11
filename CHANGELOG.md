@@ -1,5 +1,15 @@
 # Release Notes for I got issues
 
+## 3.0.0-beta.2 - 2026-11-11
+
+### Fixed
+
+- **`igotissues_widget()` no longer disappears after a queue job on Craft 6.**
+  Craft 6 binds Twig as a scoped service, and Laravel's queue worker flushes scoped instances
+  after every job. The Twig extension was registered once, on the first instance, so any template
+  rendered after a job in the same process failed with "Unknown function". The extension is now
+  registered on every Twig instance that is resolved.
+
 ## 3.0.0-beta.1 - 2026-11-11
 
 ### Changed

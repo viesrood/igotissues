@@ -15,6 +15,7 @@ use craft\utilities\ClearCaches;
 use craft\web\ErrorHandler as WebErrorHandler;
 use craft\web\UrlManager;
 use craft\web\View;
+use CraftCms\Cms\Twig\Twig;
 use viesrood\igotissues\models\Settings;
 use viesrood\igotissues\services\Capture;
 use viesrood\igotissues\services\GitHub;
@@ -163,13 +164,22 @@ class Plugin extends BasePlugin
 
     private function registerTwigExtension(): void
     {
+        // Deferred until Craft is fully initialized.
+        //
+        // Craft 6 binds Twig as a scoped service. A queue worker flushes scoped
+        // instances after every job, and the next Twig instance only has the
+        // extensions registered on that instance. So register on the current
+        // instance, and again on every instance that is resolved later.
         /** @var \craft\web\Application|\craft\console\Application $app */
         $app = Craft::$app;
 
         $app->onInit(static function (): void {
-            /** @var \craft\web\View $view */
-            $view = Craft::$app->getView();
-            $view->registerTwigExtension(new IGotIssuesExtension());
+            $register = static function (Twig $twig): void {
+                $twig->registerExtension(new IGotIssuesExtension());
+            };
+
+            $register(app(Twig::class));
+            app()->afterResolving(Twig::class, $register);
         });
     }
 
