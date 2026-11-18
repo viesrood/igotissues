@@ -1,5 +1,21 @@
 # Release Notes for I got issues
 
+## 3.0.0-beta.3 - 2026-11-18
+
+### Fixed
+
+- **The report button is back in the control panel on Craft 6.** The control panel is an Inertia
+  page there, rendered from Craft's own root view, which never triggers `View::EVENT_END_BODY`.
+  The button is now added to the HTML stack of that page.
+- **The technical report lists plugin versions again.** A plugin written for Craft 6 has no `id`
+  and no `getVersion()`, so one such plugin (CKEditor, for instance) emptied the whole line.
+  Plugins are now listed by handle, with the version read from whichever of the two is there.
+
+### Known issues
+
+- **`autoInject` does not add the button to front-end pages on Craft 6**, for the same reason as
+  above. Call `igotissues_widget()` in the template instead.
+
 ## 3.0.0-beta.2 - 2026-11-11
 
 ### Fixed

@@ -560,8 +560,10 @@ class Reports extends Component
             $app = Craft::$app;
             $plugins = [];
 
-            foreach ($app->getPlugins()->getAllPlugins() as $plugin) {
-                $plugins[] = $plugin->id . ' ' . $plugin->getVersion();
+            foreach ($app->getPlugins()->getAllPlugins() as $handle => $plugin) {
+                // A plugin written for Craft 6 is a service provider: no id, no getVersion().
+                $version = method_exists($plugin, 'getVersion') ? $plugin->getVersion() : $plugin->version;
+                $plugins[] = $handle . ' ' . $version;
             }
 
             sort($plugins);

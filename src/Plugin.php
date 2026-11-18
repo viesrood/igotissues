@@ -15,7 +15,9 @@ use craft\utilities\ClearCaches;
 use craft\web\ErrorHandler as WebErrorHandler;
 use craft\web\UrlManager;
 use craft\web\View;
+use CraftCms\Cms\Cp\Events\CpNavItemsResolving;
 use CraftCms\Cms\Twig\Twig;
+use Illuminate\Support\Facades\Event as LaravelEvent;
 use viesrood\igotissues\models\Settings;
 use viesrood\igotissues\services\Capture;
 use viesrood\igotissues\services\GitHub;
@@ -194,6 +196,24 @@ class Plugin extends BasePlugin
         if ($request->getIsConsoleRequest()) {
             return;
         }
+
+        // Craft 6 renders the control panel as an Inertia page from its own root view, which never triggers
+        // View::EVENT_END_BODY. The body HTML of that page comes from the HTML stack, so the button is
+        // registered there while the navigation is resolved, which happens once per full page load.
+        LaravelEvent::listen(CpNavItemsResolving::class, static function (): void {
+            /** @var \craft\web\Request $request */
+            $request = Craft::$app->getRequest();
+
+            if (self::getInstance() === null || !$request->getIsCpRequest() || $request->getIsActionRequest()) {
+                return;
+            }
+
+            $html = Widget::html();
+
+            if ($html !== '') {
+                Craft::$app->getView()->registerHtml($html);
+            }
+        });
 
         Event::on(
             View::class,
