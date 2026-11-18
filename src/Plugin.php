@@ -199,12 +199,17 @@ class Plugin extends BasePlugin
 
         // Craft 6 renders the control panel as an Inertia page from its own root view, which never triggers
         // View::EVENT_END_BODY. The body HTML of that page comes from the HTML stack, so the button is
-        // registered there while the navigation is resolved, which happens once per full page load.
+        // registered there while the navigation is resolved. Only on a full page load: a visit inside the
+        // control panel (an Inertia request) keeps the body, and the button with it.
         LaravelEvent::listen(CpNavItemsResolving::class, static function (): void {
             /** @var \craft\web\Request $request */
             $request = Craft::$app->getRequest();
 
             if (self::getInstance() === null || !$request->getIsCpRequest() || $request->getIsActionRequest()) {
+                return;
+            }
+
+            if (request()->headers->has('X-Inertia')) {
                 return;
             }
 

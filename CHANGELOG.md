@@ -1,5 +1,13 @@
 # Release Notes for I got issues
 
+## 3.0.0-beta.4 - 2026-11-18
+
+### Changed
+
+- **The control panel button is only registered on a full page load.** A visit inside the Craft 6
+  control panel is an Inertia request that keeps the page body. The button was not duplicated
+  there, but only because of the order in which Craft resolves its page props.
+
 ## 3.0.0-beta.3 - 2026-11-18
 
 ### Fixed
